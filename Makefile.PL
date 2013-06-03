@@ -6,6 +6,7 @@ WriteMakefile(
     'VERSION_FROM'	=> 'lib/HTML/FillInForm.pm', # finds $VERSION
     'PREREQ_PM'		=> {
 	HTML::Parser => 3.26,
+	HTML::TokeParser => 3.26,
         warnings => 0
       },
 );

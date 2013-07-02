@@ -273,7 +273,7 @@ sub start {
     if (defined($value)){
       # check for input type, noting that default type is text
       if (!exists $attr->{'type'} ||
-	  $attr->{'type'} =~ /^(text|textfield|hidden|)$/i){
+	  $attr->{'type'} =~ /^(text|textfield|hidden|tel|search|url|email|datetime|date|month|week|time|datetime\-local|number|range|color|)$/i){
 	if ( ref($value) eq 'ARRAY' ) {
 	  $value = shift @$value;
 	  $value = '' unless defined $value;

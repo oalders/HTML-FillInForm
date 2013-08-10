@@ -1,4 +1,8 @@
 
+2.20 - August 10th, 2013
+
+    - Updated to support HTML5 (RT #75933, thanks to charsbar)
+
 2.11 - June 3rd, 2013
 
 Updated tests so that they pass with Perl 5.18 (Mark Stosberg)

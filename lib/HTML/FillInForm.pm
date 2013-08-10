@@ -10,7 +10,7 @@ use Carp; # generate better errors with more context
 require 5.005;
 
 use vars qw($VERSION @ISA);
-$VERSION = '2.11';
+$VERSION = '2.20';
 
 
 sub new {

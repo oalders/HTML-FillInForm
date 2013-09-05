@@ -245,7 +245,10 @@ sub start {
     delete $self->{open}{option};
   }
 
-  $self->{open}{ $tagname } = { attr => $attr, origtext => $origtext };
+  # $tag is a context hash for this tag. We keep track of all the open
+  # tags to coordinate between callbacks.
+  my $tag = { attr => $attr, origtext => $origtext };
+  $self->{open}{ $tagname } = $tag;
 
   # Check if we need to disable this field
   $attr->{disabled} = 'disabled'
@@ -255,11 +258,10 @@ sub start {
     not ( exists $attr->{disabled} and $attr->{disabled} );
 
   # Check if we need to invalidate this field
-  my $invalidating = 0;
   if (exists $attr->{name} and
         exists $self->{invalid_fields}{ $attr->{name} } and
     $self->{invalid_fields}{ $attr->{name} }) {
-    $invalidating = 1;
+    $tag->{has_changed} = 1;
     if (exists $attr->{class} and length $attr->{class}) {
       # don't add the class if it's already there
       unless ($attr->{class} =~ /\b\Q$self->{invalid_class}\E\b/) {
@@ -390,7 +392,7 @@ sub start {
   } elsif ($tagname eq 'textarea') {
     # need to re-output the <textarea> if we're marking it invalid
     # (doesn't disable need this too?)
-    if ($invalidating) {
+    if ($tag->{has_changed}) {
         $self->{output} .= "<$tagname";
         while (my ($key, $value) = each %$attr) {
             $self->{output} .= sprintf qq( %s="%s"), $key, $value;
@@ -417,14 +419,14 @@ sub start {
 
     # need to re-output the <select> if we're marking it invalid
     # (doesn't disable need this too?)
-    if ($invalidating) {
-        $self->{output} .= "<$tagname";
-        while (my ($key, $value) = each %$attr) {
-            $self->{output} .= sprintf qq( %s="%s"), $key, $value;
-        }
-        $self->{output} .= ">";
+    if ($tag->{has_changed}) {
+      $self->{output} .= "<$tagname";
+      while (my ($key, $value) = each %$attr) {
+        $self->{output} .= sprintf qq( %s="%s"), $key, $value;
+      }
+      $self->{output} .= ">";
     } else {
-        $self->{output} .= $origtext;
+      $self->{output} .= $origtext;
     }
   } else {
     $self->{output} .= $origtext;

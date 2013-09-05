@@ -245,13 +245,7 @@ sub start {
     delete $self->{open}{option};
   }
 
-  #$self->{open}{ $tagname } = { attr => $attr, origtext => $origtext };
-
-  # XXX  
-  if ($self->{option_no_value}) {
-    $self->{output} .= '>';
-    delete $self->{option_no_value};
-  }
+  $self->{open}{ $tagname } = { attr => $attr, origtext => $origtext };
 
   # Check if we need to disable this field
   $attr->{disabled} = 'disabled'
@@ -346,7 +340,8 @@ sub start {
     $self->{output} .= ' /' if $attr->{'/'};
     $self->{output} .= ">";
   } elsif ($tagname eq 'option'){
-    my $value = $self->_get_param($self->{selectName});
+    my $select_name =$self->{open}{select}{attr}{name};
+    my $value = $self->_get_param( $select_name );
 
     # browsers do not pass selects with no selected options at all,
     # so hack around
@@ -413,7 +408,6 @@ sub start {
       $self->{output} .= __escapeHTML($value);
     }
   } elsif ($tagname eq 'select') {
-    $self->{selectName} = $attr->{'name'};
     if (defined $attr->{'multiple'}) {
       $self->{selectMultiple} = 1; # helper var to remember if the select tag has the multiple attr set or not
     } else {
@@ -502,6 +496,8 @@ sub end {
   } elsif ($tagname eq 'form') {
     delete $self->{'current_form'};
   }
+
+  delete $self->{open}{ $tagname };
 
   $self->{output} .= $origtext;
 }

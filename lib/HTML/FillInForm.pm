@@ -230,7 +230,7 @@ sub _get_param {
 }
 
 
-sub _write_tag {
+sub _output_tag {
   my $self = shift;
   my $tag = shift or croak "no tag supplied";
 
@@ -253,6 +253,11 @@ sub _write_tag {
 
 
 my %form_tags = map { $_ => 1 } qw/ form input option select textarea /;
+
+# we handle these input tags specially
+my %special_input_type = map { $_ => 1 } qw/
+  password radio checkbox
+/;
 
 # handles opening HTML tags such as <input ...>
 sub start {
@@ -286,10 +291,9 @@ sub start {
   }
 
   # If an option tag is still open, close it before handling the new tag
-  $self->_write_tag('option') if $self->{open}{option};
+  $self->_output_tag('option') if $self->{open}{option};
 
-  # $tag is a context hash for this tag. We keep track of all the open
-  # tags to coordinate between callbacks.
+  # We keep track of all the open tags to coordinate between callbacks
   my $tag = { tagname => $tagname, attr => $attr, origtext => $origtext };
   $self->{open}{ $tagname } = $tag;
 
@@ -324,38 +328,35 @@ sub start {
     my $value = exists $attr->{name} 
                   ? $self->_get_param($attr->{name}) : undef;
 
-    # force hidden fields to have a value
-    $value = '' if exists($attr->{type}) &&
-                   $attr->{type} eq 'hidden' &&
-                   ! exists $attr->{value} &&
-                   ! defined $value;
+    if (exists $attr->{type} and not defined $value) {
+      # force hidden fields to have a value
+      if ($attr->{type} eq 'hidden') {
+        $value = '' unless exists $attr->{value};
+      }
 
-    # browsers do not pass unchecked checkboxes at all, so hack around
-    $value = '' if $self->{clear_absent_checkboxes} &&
-                   !defined $value &&
-                   exists($attr->{'type'}) &&
-                   ($attr->{'type'} eq 'checkbox' || $attr->{'type'} eq 'radio');
+      # browsers do not pass unchecked checkboxes at all, so hack around
+      if ($attr->{type} eq 'checkbox' || $attr->{type} eq 'radio') {
+        $value = '' if $self->{clear_absent_checkboxes};
+      }
+    }
+
+    if (!defined $value and !$tag->{has_changed}) {
+      $self->{output} .= $origtext;
+      return;
+    }
 
     if (defined($value)) {
-      # check for input type, noting that default type is text
-      if (!exists $attr->{type} ||
-          $attr->{type} =~ /^(text|textfield|hidden|tel|search|url|email|datetime|date|month|week|time|datetime\-local|number|range|color|)$/i) {
-        if (ref $value eq 'ARRAY') {
-          $value = shift @$value;
-          $value = '' unless defined $value;
-        }
-        $attr->{value} = __escapeHTML($value);
-      } elsif (lc $attr->{type} eq 'password' && $self->{fill_password}) {
-        if (ref($value) eq 'ARRAY') {
-          $value = shift @$value;
-          $value = '' unless defined $value;
-        }
-        $attr->{value} = __escapeHTML($value);
-      } elsif (lc $attr->{'type'} eq 'radio') {
-        if (ref($value) eq 'ARRAY') {
-          $value = $value->[0];
-          $value = '' unless defined $value;
-        }
+      my $type = defined $attr->{type} ? lc $attr->{type} : 'text';
+
+      if (!$special_input_type{ $type }) {
+        $value = shift @$value if ref $value eq 'ARRAY';
+        $attr->{value} = __escapeHTML(defined $value ? $value : '');
+      } elsif ($type eq 'password' && $self->{fill_password}) {
+        $value = shift @$value if ref $value eq 'ARRAY';
+        $attr->{value} = __escapeHTML(defined $value ? $value : '');
+      } elsif ($type eq 'radio') {
+        $value = $value->[0] if ref $value eq 'ARRAY';
+        $value = '' unless defined $value;
 
         # value for radio boxes default to 'on', works with netscape
         $attr->{value} = 'on' unless exists $attr->{value};
@@ -364,22 +365,22 @@ sub start {
         } else {
           delete $attr->{checked};
         }
-      } elsif (lc $attr->{type} eq 'checkbox') {
+      } elsif ($type eq 'checkbox') {
         # value for checkboxes default to 'on', works with netscape
         $attr->{value} = 'on' unless exists $attr->{value};
 
         delete $attr->{checked}; # Everything is unchecked to start
         $value = [ $value ] unless ref $value eq 'ARRAY';
         foreach my $v (@$value) {
-          $attr->{checked} = 'checked' if $attr->{value} eq __escapeHTML($v);
+          if ($attr->{value} eq __escapeHTML($v)) {
+            $attr->{checked} = 'checked';
+            last;
+          }
         }
       }
-      # } else {
-      #   warn qq(Input field of unknown type "$attr->{type}": $origtext);
-      # }
     }
 
-    $self->_write_tag($tag);
+    $self->_output_tag($tag);
   } elsif ($tagname eq 'select') {
     my $value = $self->_get_param($tag->{attr}{name});
     # browsers do not pass selects with no selected options at all,
@@ -394,7 +395,7 @@ sub start {
     ];
 
     if ($tag->{has_changed}) {
-      $self->_write_tag($tag);
+      $self->_output_tag($tag);
     } else {
       $self->{output} .= $origtext;
     }
@@ -437,22 +438,24 @@ sub start {
       }
     }
 
-    $self->_write_tag($tag) unless $keep_tag_open;
+    $self->_output_tag($tag) unless $keep_tag_open;
   } elsif ($tagname eq 'textarea') {
     if ($tag->{has_changed}) {
-      $self->_write_tag($tag);
+      $self->_output_tag($tag);
     } else {
       $self->{output} .= $origtext;
     }
 
     if ($attr->{name} and
-        defined (my $value = $self->_get_param($attr->{'name'}))) {
+        defined (my $value = $self->_get_param($attr->{name}))) {
 
-      $value = (shift @$value || '') if ref $value eq 'ARRAY';
       # <textarea> foobar </textarea> -> <textarea> $value </textarea>
       # we need to set outputText to 'no' so that 'foobar' won't be printed
       $tag->{suppress_content} = 1;
-      $self->{output} .= __escapeHTML($value);
+
+      # append the new textarea contents
+      $value = shift @$value if ref $value eq 'ARRAY';
+      $self->{output} .= __escapeHTML(defined $value ? $value : '');
     }
   }
 }
@@ -484,8 +487,7 @@ sub text {
       }
     }
 
-    # close <option> tag
-    $self->_write_tag('option');
+    $self->_output_tag('option');
   }
 
   $self->{output} .= $origtext;
@@ -496,7 +498,7 @@ sub text {
 sub end {
   my ($self, $tagname, $origtext) = @_;
 
-  $self->_write_tag('option') if $self->{open}{option};
+  $self->_output_tag('option') if $self->{open}{option};
 
   delete $self->{current_form} if $tagname eq 'form';
   delete $self->{open}{ $tagname };
@@ -509,6 +511,7 @@ sub __escapeHTML {
   my ($toencode) = @_;
 
   return undef unless defined($toencode);
+
   $toencode =~ s/&/&amp;/g;
   $toencode =~ s/\"/&quot;/g;
   $toencode =~ s/>/&gt;/g;
@@ -518,7 +521,8 @@ sub __escapeHTML {
 
 
 sub comment {
-  my ( $self, $text ) = @_;
+  my ($self, $text) = @_;
+
   # if it begins with '[if ' and doesn't end with '<![endif]'
   # it's a "downlevel-revealed" conditional comment (stupid IE)
   # or

@@ -404,7 +404,7 @@ sub start {
       $value = (shift @$value || '') if ref($value) eq 'ARRAY';
       # <textarea> foobar </textarea> -> <textarea> $value </textarea>
       # we need to set outputText to 'no' so that 'foobar' won't be printed
-      $self->{outputText} = 'no';
+      $self->{open}{textarea}{suppress_content} = 1;
       $self->{output} .= __escapeHTML($value);
     }
   } elsif ($tagname eq 'select') {
@@ -458,7 +458,8 @@ sub text {
   my ($self, $origtext) = @_;
 
   # if textarea value has changed, don't output it
-  return if exists $self->{outputText} && $self->{outputText} eq 'no';
+  my $textarea = $self->{open}{textarea};
+  return if $textarea && $textarea->{suppress_content};
 
   # dealing with option tag with no value - <OPTION>bar</OPTION>
   if (my $values = $self->{option_no_value}) {
@@ -489,14 +490,7 @@ sub end {
     delete $self->{option_no_value};
   }
 
-  if ($tagname eq 'select') {
-    delete $self->{selectName};
-  } elsif ($tagname eq 'textarea'){
-    delete $self->{outputText};
-  } elsif ($tagname eq 'form') {
-    delete $self->{'current_form'};
-  }
-
+  delete $self->{current_form} if $tagname eq 'form';
   delete $self->{open}{ $tagname };
 
   $self->{output} .= $origtext;

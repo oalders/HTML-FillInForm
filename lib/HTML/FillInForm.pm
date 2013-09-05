@@ -201,31 +201,55 @@ sub fill {
   return delete $self->{output};
 }
 
+sub _build_tag {
+  my $self = shift;
+  my ($tagname, $attr, $attrseq, $origtext) = @_;
+}
+
+my %form_tags = map { $_ => 1 } qw/ form input option select textarea /;
+
 # handles opening HTML tags such as <input ...>
 sub start {
   my ($self, $tagname, $attr, $attrseq, $origtext) = @_;
 
+  # If not a form tag, append original content and return immediately
+  unless (exists $form_tags{ $tagname }) {
+    $self->{output} .= $origtext;
+    return;
+  }
+
   # set the current form
   if ($tagname eq 'form') {
     $self->{object_param_cache} = {};
-    if (exists $attr->{'name'} || exists $attr->{'id'}) {
-      $self->{'current_form'} = $attr->{'name'} || $attr->{'id'};
-    } else {
-      # in case of previous one without </FORM>
-      delete $self->{'current_form'};
-    }
-  }
 
-  # This form is not my target
-  if (exists $self->{'target'} &&
-       (! exists $self->{'current_form'} ||
-       $self->{'current_form'} ne $self->{'target'})) {
-    $self->{'output'} .= $origtext;
+    delete $self->{current_form}; # in case previous one without </form>
+    if (exists $attr->{name} || exists $attr->{id}) {
+      $self->{current_form} = $attr->{name} || $attr->{id};
+    }
+
+    $self->{output} .= $origtext;
     return;
   }
-  
-  if ($self->{option_no_value}) {
+
+  # This is not the form we're looking for
+  if (exists $self->{target} &&
+       (! exists $self->{current_form} ||
+       $self->{current_form} ne $self->{target})) {
+    $self->{output} .= $origtext;
+    return;
+  }
+
+  # If an option tag is still open, close it before handling the new tag
+  if ($self->{open}{option}) {
     $self->{output} .= '>';
+    delete $self->{open}{option};
+  }
+
+  #$self->{open}{ $tagname } = { attr => $attr, origtext => $origtext };
+
+  # XXX  
+  if ($self->{option_no_value}) {
+    # $self->{output} .= '>';
     delete $self->{option_no_value};
   }
 
@@ -239,17 +263,17 @@ sub start {
   # Check if we need to invalidate this field
   my $invalidating = 0;
   if (exists $attr->{name} and
-      exists $self->{invalid_fields}{ $attr->{name} } and
-      $self->{invalid_fields}{ $attr->{name} }) {
-      $invalidating = 1;
-      if (exists $attr->{class} and length $attr->{class}) {
-          # don't add the class if it's already there
-          unless ($attr->{class} =~ /\b\Q$self->{invalid_class}\E\b/) {
-              $attr->{class} .= " $self->{invalid_class}";
-          }
-      } else {
-          $attr->{class} = $self->{invalid_class};
+        exists $self->{invalid_fields}{ $attr->{name} } and
+    $self->{invalid_fields}{ $attr->{name} }) {
+    $invalidating = 1;
+    if (exists $attr->{class} and length $attr->{class}) {
+      # don't add the class if it's already there
+      unless ($attr->{class} =~ /\b\Q$self->{invalid_class}\E\b/) {
+        $attr->{class} .= " $self->{invalid_class}";
       }
+    } else {
+      $attr->{class} = $self->{invalid_class};
+    }
   }
 
   if ($tagname eq 'input'){
@@ -270,19 +294,19 @@ sub start {
 
     if (defined($value)) {
       # check for input type, noting that default type is text
-      if (!exists $attr->{'type'} ||
-          $attr->{'type'} =~ /^(text|textfield|hidden|tel|search|url|email|datetime|date|month|week|time|datetime\-local|number|range|color|)$/i) {
+      if (!exists $attr->{type} ||
+          $attr->{type} =~ /^(text|textfield|hidden|tel|search|url|email|datetime|date|month|week|time|datetime\-local|number|range|color|)$/i) {
+        if (ref $value eq 'ARRAY') {
+          $value = shift @$value;
+          $value = '' unless defined $value;
+        }
+        $attr->{value} = __escapeHTML($value);
+      } elsif (lc $attr->{type} eq 'password' && $self->{fill_password}) {
         if (ref($value) eq 'ARRAY') {
           $value = shift @$value;
           $value = '' unless defined $value;
         }
-        $attr->{'value'} = __escapeHTML($value);
-      } elsif (lc $attr->{'type'} eq 'password' && $self->{fill_password}) {
-        if (ref($value) eq 'ARRAY') {
-          $value = shift @$value;
-          $value = '' unless defined $value;
-        }
-        $attr->{'value'} = __escapeHTML($value);
+        $attr->{value} = __escapeHTML($value);
       } elsif (lc $attr->{'type'} eq 'radio') {
         if (ref($value) eq 'ARRAY') {
           $value = $value->[0];
@@ -290,15 +314,15 @@ sub start {
         }
 
         # value for radio boxes default to 'on', works with netscape
-        $attr->{'value'} = 'on' unless exists $attr->{'value'};
-        if ($attr->{'value'} eq __escapeHTML($value)) {
-          $attr->{'checked'} = 'checked';
+        $attr->{value} = 'on' unless exists $attr->{value};
+        if ($attr->{value} eq __escapeHTML($value)) {
+          $attr->{checked} = 'checked';
         } else {
-          delete $attr->{'checked'};
+          delete $attr->{checked};
         }
-      } elsif (lc $attr->{'type'} eq 'checkbox') {
+      } elsif (lc $attr->{type} eq 'checkbox') {
         # value for checkboxes default to 'on', works with netscape
-        $attr->{'value'} = 'on' unless exists $attr->{'value'};
+        $attr->{value} = 'on' unless exists $attr->{value};
 
         delete $attr->{'checked'}; # Everything is unchecked to start
         $value = [ $value ] unless ref($value) eq 'ARRAY';
@@ -416,21 +440,20 @@ sub start {
 sub _get_param {
   my ($self, $param) = @_;
 
-  return undef if $self->{ignore_fields}{$param};
+  return undef if $self->{ignore_fields}{ $param };
 
-  return $self->{fdat}{$param} if exists $self->{fdat}{$param};
+  return $self->{fdat}{$param} if exists $self->{fdat}{ $param };
 
-  return $self->{object_param_cache}{$param}
-    if exists $self->{object_param_cache}{$param};
+  return $self->{object_param_cache}{ $param }
+    if exists $self->{object_param_cache}{ $param };
 
   # traverse the list in reverse order for backwards compatibility
   # with the previous implementation.
-  for my $o (reverse @{$self->{objects}}) {
+  for my $o (reverse @{ $self->{objects} }) {
     my @v = $o->param($param);
-
     next unless @v;
 
-    return $self->{object_param_cache}{$param} = @v > 1 ? \@v : $v[0];
+    return $self->{object_param_cache}{ $param } = @v > 1 ? \@v : $v[0];
   }
 
   return undef;

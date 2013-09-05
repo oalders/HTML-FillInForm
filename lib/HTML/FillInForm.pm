@@ -373,10 +373,10 @@ sub start {
         foreach my $v (@$value) {
           $attr->{checked} = 'checked' if $attr->{value} eq __escapeHTML($v);
         }
-
-      # } else {
-      #    warn(qq(Input field of unknown type "$attr->{type}": $origtext));
       }
+      # } else {
+      #   warn qq(Input field of unknown type "$attr->{type}": $origtext);
+      # }
     }
 
     $self->_write_tag($tag);
@@ -385,14 +385,14 @@ sub start {
     # browsers do not pass selects with no selected options at all,
     # so hack around
     $value = '' if $self->{clear_absent_checkboxes} && !defined $value;
-    $tag->{values} = [
+    # squirrel away values array for use in option tags
+    $tag->{escaped_values} = [
+      map { __escapeHTML($_) }
       grep { defined }
       map { ref $value eq 'ARRAY' ? @$_ : $_ }
       $value
     ];
 
-    # need to re-output the <select> if we're marking it invalid
-    # (doesn't disable need this too?)
     if ($tag->{has_changed}) {
       $self->_write_tag($tag);
     } else {
@@ -401,22 +401,24 @@ sub start {
   } elsif ($tagname eq 'option') {
     my $select_tag = $self->{open}{select} || {};
     my $select_name = $select_tag->{attr}{name};
-    my $select_multiple = defined $select_tag->{attr}{multiple} ? 1 : 0;
-    my $values = $select_tag->{values};
+    my $values = $select_tag->{escaped_values} || [];
 
-    my $close_tag = 1; # XXX simple as possible?
-    if (defined $values->[0]) {
-      $close_tag = 0;
+    # If an option tag doesn't have a value attribute, the value of
+    # it's inner contents is used (e.g., <option>foo</option>).
+    # So in the case where a value has been selected, but there's no
+    # value attribute, we need to wait until we process the inner
+    # contents to know if a match exists.
+    my $keep_tag_open = @$values && !exists $attr->{value};
+
+    if (@$values) {
       delete $attr->{selected} if exists $attr->{selected};
-      
+ 
+      # if option tag has value attr - <OPTION VALUE="foo">bar</OPTION>
       if (defined $attr->{value}) {
-        $close_tag = 1;
-        # option tag has value attr - <OPTION VALUE="foo">bar</OPTION>
-        
-        if ($select_multiple) {
+        if (defined $select_tag->{attr}{multiple}) {
           # check if the option tag belongs to a multiple option select
-          foreach my $v (grep { defined } @$values) {
-            if ($attr->{value} eq __escapeHTML($v)) {
+          foreach my $v (@$values) {
+            if ($attr->{value} eq $v) {
               $attr->{selected} = 'selected';
               last;
             }
@@ -424,7 +426,7 @@ sub start {
         } else {
           # if not every value of a fdat ARRAY belongs to a different select tag
           unless ($select_tag->{already_selected}) {
-            if ($attr->{value} eq __escapeHTML($values->[0])) {
+            if ($attr->{value} eq $values->[0]) {
               $attr->{selected} = 'selected';
 
               # remember that an option was selected for this tag
@@ -435,18 +437,18 @@ sub start {
       }
     }
 
-    $self->_write_tag($tag) if $close_tag;
+    $self->_write_tag($tag) unless $keep_tag_open;
   } elsif ($tagname eq 'textarea') {
-    # need to re-output the <textarea> if we're marking it invalid
-    # (doesn't disable need this too?)
     if ($tag->{has_changed}) {
       $self->_write_tag($tag);
     } else {
       $self->{output} .= $origtext;
     }
 
-    if ($attr->{'name'} and defined (my $value = $self->_get_param($attr->{'name'}))) {
-      $value = (shift @$value || '') if ref($value) eq 'ARRAY';
+    if ($attr->{name} and
+        defined (my $value = $self->_get_param($attr->{'name'}))) {
+
+      $value = (shift @$value || '') if ref $value eq 'ARRAY';
       # <textarea> foobar </textarea> -> <textarea> $value </textarea>
       # we need to set outputText to 'no' so that 'foobar' won't be printed
       $tag->{suppress_content} = 1;
@@ -470,7 +472,7 @@ sub text {
   if (my $option = $self->{open}{option} and 
       my $select = $self->{open}{select}) {
     
-    my $selected_values = $select->{values};
+    my $selected_values = $select->{escaped_values};
     
     my $value = $origtext;
     $value =~ s/^\s+|\s+$//g;

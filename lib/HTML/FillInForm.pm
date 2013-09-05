@@ -249,7 +249,7 @@ sub start {
 
   # XXX  
   if ($self->{option_no_value}) {
-    # $self->{output} .= '>';
+    $self->{output} .= '>';
     delete $self->{option_no_value};
   }
 

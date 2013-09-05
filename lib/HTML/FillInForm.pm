@@ -68,11 +68,11 @@ sub fill {
 
   # If the first arg is a scalarref, translate that to scalarref => $first_arg
   if (ref $_[0] eq 'SCALAR') {
-      $option{scalarref} = shift;
+    $option{scalarref} = shift;
   } elsif (ref $_[0] eq 'ARRAY') {
-      $option{arrayref} = shift;
+    $option{arrayref} = shift;
   } elsif (ref $_[0] eq 'GLOB') {
-      $option{file} = shift;
+    $option{file} = shift;
   } elsif (ref $_[0]) {
     croak "data source is not a reference type we understand";
   }
@@ -81,7 +81,7 @@ sub fill {
   elsif (not _known_keys()->{$_[0]} )  {
     $option{file} =  shift;
   } else {
-      # Should be a known key. Nothing to do.
+    # Should be a known key. Nothing to do.
   }
 
   # Now, check to see if the next arg is also a reference. 
@@ -116,16 +116,16 @@ sub fill {
         $merged{$key} = $hash->{$key};
       }
     }
-    $option{'fdat'} = \%merged;
+    $option{fdat} = \%merged;
   }
 
   my %ignore_fields;
-  %ignore_fields = map { $_ => 1 } ( ref $option{'ignore_fields'} eq 'ARRAY' )
+  %ignore_fields = map { $_ => 1 } ( ref $option{ignore_fields} eq 'ARRAY' )
     ? @{ $option{ignore_fields} } : $option{ignore_fields} if exists( $option{ignore_fields} );
   $self->{ignore_fields} = \%ignore_fields;
 
   my %disable_fields;
-  %disable_fields = map { $_ => 1 } ( ref $option{'disable_fields'} eq 'ARRAY' )
+  %disable_fields = map { $_ => 1 } ( ref $option{disable_fields} eq 'ARRAY' )
     ? @{ $option{disable_fields} } : $option{disable_fields} if exists( $option{disable_fields} );
   $self->{disable_fields} = \%disable_fields;
 
@@ -162,13 +162,13 @@ sub fill {
   }
 
   if (my $target = $option{target}) {
-    $self->{'target'} = $target;
+    $self->{target} = $target;
   }
 
   if (my $invalid_class = $option{invalid_class}) {
-    $self->{'invalid_class'} = $invalid_class;
+    $self->{invalid_class} = $invalid_class;
   } else {
-    $self->{'invalid_class'} = 'invalid';
+    $self->{invalid_class} = 'invalid';
   }
 
   if (defined($option{fill_password})) {
@@ -185,6 +185,7 @@ sub fill {
           "'fdat' parameter set";
   }
 
+  # XXX why local?
   local $self->{object_param_cache};
 
   if (my $file = $option{file}) {
@@ -205,6 +206,7 @@ sub _build_tag {
   my $self = shift;
   my ($tagname, $attr, $attrseq, $origtext) = @_;
 }
+
 
 my %form_tags = map { $_ => 1 } qw/ form input option select textarea /;
 
@@ -251,18 +253,21 @@ sub start {
   $self->{open}{ $tagname } = $tag;
 
   # Check if we need to disable this field
-  $attr->{disabled} = 'disabled'
-    if exists $attr->{'name'} and
-    exists $self->{disable_fields}{ $attr->{'name'} } and
-    $self->{disable_fields}{ $attr->{'name'} } and
-    not ( exists $attr->{disabled} and $attr->{disabled} );
+  if (exists $attr->{name} &&
+      exists $self->{disable_fields}{ $attr->{name} } &&
+      $self->{disable_fields}{ $attr->{name} } &&
+      not (exists $attr->{disabled} and $attr->{disabled})) {
+
+    $attr->{disabled} = 'disabled';
+    $tag->{has_changed} = 1;
+  }
 
   # Check if we need to invalidate this field
-  if (exists $attr->{name} and
-        exists $self->{invalid_fields}{ $attr->{name} } and
-    $self->{invalid_fields}{ $attr->{name} }) {
-    $tag->{has_changed} = 1;
-    if (exists $attr->{class} and length $attr->{class}) {
+  if (exists $attr->{name} && 
+      exists $self->{invalid_fields}{ $attr->{name} } &&
+      $self->{invalid_fields}{ $attr->{name} }) {
+
+    if (exists $attr->{class} && length $attr->{class}) {
       # don't add the class if it's already there
       unless ($attr->{class} =~ /\b\Q$self->{invalid_class}\E\b/) {
         $attr->{class} .= " $self->{invalid_class}";
@@ -270,16 +275,18 @@ sub start {
     } else {
       $attr->{class} = $self->{invalid_class};
     }
+
+    $tag->{has_changed} = 1;
   }
 
   if ($tagname eq 'input'){
-    my $value = exists $attr->{'name'} 
-                  ? $self->_get_param($attr->{'name'}) : undef;
+    my $value = exists $attr->{name} 
+                  ? $self->_get_param($attr->{name}) : undef;
 
     # force hidden fields to have a value
-    $value = '' if exists($attr->{'type'}) &&
-                   $attr->{'type'} eq 'hidden' &&
-                   ! exists $attr->{'value'} &&
+    $value = '' if exists($attr->{type}) &&
+                   $attr->{type} eq 'hidden' &&
+                   ! exists $attr->{value} &&
                    ! defined $value;
 
     # browsers do not pass unchecked checkboxes at all, so hack around
@@ -320,16 +327,14 @@ sub start {
         # value for checkboxes default to 'on', works with netscape
         $attr->{value} = 'on' unless exists $attr->{value};
 
-        delete $attr->{'checked'}; # Everything is unchecked to start
-        $value = [ $value ] unless ref($value) eq 'ARRAY';
-        foreach my $v ( @$value ) {
-          if ( $attr->{'value'} eq __escapeHTML($v) ) {
-            $attr->{'checked'} = 'checked';
-          }
+        delete $attr->{checked}; # Everything is unchecked to start
+        $value = [ $value ] unless ref $value eq 'ARRAY';
+        foreach my $v (@$value) {
+          $attr->{checked} = 'checked' if $attr->{value} eq __escapeHTML($v);
         }
 
-        #      } else {
-        # warn(qq(Input field of unknown type "$attr->{type}": $origtext));
+      # } else {
+      #    warn(qq(Input field of unknown type "$attr->{type}": $origtext));
       }
     }
 
@@ -342,13 +347,14 @@ sub start {
     $self->{output} .= ' /' if $attr->{'/'};
     $self->{output} .= ">";
   } elsif ($tagname eq 'option'){
-    my $select_name =$self->{open}{select}{attr}{name};
-    my $value = $self->_get_param( $select_name );
+    my $select_tag = $self->{open}{select};
+    my $select_name = $select_tag->{attr}{name};
+    my $select_multiple = defined $select_tag->{attr}{multiple};
 
+    my $value = $self->_get_param( $select_name );
     # browsers do not pass selects with no selected options at all,
     # so hack around
     $value = '' if $self->{clear_absent_checkboxes} && !defined $value;
-
     $value = [ $value ] unless ( ref($value) eq 'ARRAY' );
 
     if (defined $value->[0]) {
@@ -357,7 +363,7 @@ sub start {
       if (defined($attr->{'value'})) {
         # option tag has value attr - <OPTION VALUE="foo">bar</OPTION>
         
-        if ($self->{selectMultiple}){
+        if ($select_multiple) {
           # check if the option tag belongs to a multiple option select
           foreach my $v (grep { defined } @$value) {
             if ($attr->{'value'} eq __escapeHTML($v)) {
@@ -367,11 +373,14 @@ sub start {
           }
         } else {
           # if not every value of a fdat ARRAY belongs to a different select tag
-          if (not $self->{selectSelected}){
-            if ( $attr->{'value'} eq __escapeHTML($value->[0])){
+          my $select_tag = $self->{open}{select};
+          if ($select_tag && !$select_tag->{already_selected}) {
+            if ($attr->{'value'} eq __escapeHTML($value->[0])) {
               shift @$value if ref($value) eq 'ARRAY';
               $attr->{selected} = 'selected';
-              $self->{selectSelected} = 1; # remeber that an option tag is selected for this select tag
+
+              # remember that an option was selected for this tag
+              $select_tag->{already_selected} = 1;
             }
           }
         }
@@ -410,13 +419,6 @@ sub start {
       $self->{output} .= __escapeHTML($value);
     }
   } elsif ($tagname eq 'select') {
-    if (defined $attr->{'multiple'}) {
-      $self->{selectMultiple} = 1; # helper var to remember if the select tag has the multiple attr set or not
-    } else {
-      $self->{selectMultiple} = 0;
-      $self->{selectSelected} = 0; # helper var to remember if an option was already selected in the current select tag
-    }
-
     # need to re-output the <select> if we're marking it invalid
     # (doesn't disable need this too?)
     if ($tag->{has_changed}) {

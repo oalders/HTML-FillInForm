@@ -21,7 +21,7 @@ sub new {
 
   my %arg = @_ || ();
   my $parser_class = $arg{parser_class} || 'HTML::Parser';
-  eval "require $parser_class;" || die "require $parser_class failed: $@";
+  eval "require $parser_class" or die "require $parser_class failed: $@";
   @ISA = ($parser_class);
 
   $self->init(@_);
@@ -230,11 +230,19 @@ sub _get_param {
 }
 
 
+sub _tag {
+  my $self = shift;
+  my $tagname = shift or croak "no tag name supplied";
+
+  return $self->{open}{ $tagname };
+}
+
+
 sub _write_tag {
   my $self = shift;
   my $tag = shift or croak "no tag supplied";
 
-  $tag = $self->{open}{ $tag } || {} unless ref $tag;
+  $tag = $self->_tag($tag) || {} unless ref $tag;
   my $attr = $tag->{attr} || {};
 
   $self->{output} .= "<$tag->{tagname}";
@@ -284,7 +292,7 @@ sub start {
   }
 
   # If an option tag is still open, close it before handling the new tag
-  $self->_write_tag('option') if $self->{open}{option};
+  $self->_write_tag('option') if $self->_tag('option');
 
   # $tag is a context hash for this tag. We keep track of all the open
   # tags to coordinate between callbacks.
@@ -397,7 +405,7 @@ sub start {
       $self->{output} .= $origtext;
     }
   } elsif ($tagname eq 'option') {
-    my $select_tag = $self->{open}{select} || {};
+    my $select_tag = $self->_tag('select') || {};
     my $select_name = $select_tag->{attr}{name};
     my $select_multiple = defined $select_tag->{attr}{multiple} ? 1 : 0;
     my $values = $select_tag->{values};
@@ -447,7 +455,7 @@ sub start {
       $value = (shift @$value || '') if ref($value) eq 'ARRAY';
       # <textarea> foobar </textarea> -> <textarea> $value </textarea>
       # we need to set outputText to 'no' so that 'foobar' won't be printed
-      $self->{open}{textarea}{suppress_content} = 1;
+      $tag->{suppress_content} = 1;
       $self->{output} .= __escapeHTML($value);
     }
   }
@@ -458,12 +466,13 @@ sub start {
 sub text {
   my ($self, $origtext) = @_;
 
-  # if textarea value has changed, don't output it
-  my $textarea = $self->{open}{textarea};
+  # if submitted textarea value has already been output, don't write
+  # the original contents
+  my $textarea = $self->_tag('textarea');
   return if $textarea && $textarea->{suppress_content};
 
   # dealing with option tag with no value - <OPTION>bar</OPTION>
-  if ($self->{open}{option} and my $select_tag = $self->{open}{select}) {
+  if ($self->_tag('option') and my $select_tag = $self->_tag('select')) {
     my $values = $select_tag->{values};
     
     my $value = $origtext;

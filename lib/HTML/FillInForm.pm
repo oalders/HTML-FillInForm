@@ -9,7 +9,7 @@ use Carp; # generate better errors with more context
 # required for UNIVERSAL->can
 require 5.005;
 
-use vars qw($VERSION @ISA);
+use vars qw( $VERSION @ISA );
 $VERSION = '2.20';
 
 
@@ -21,20 +21,21 @@ sub new {
 
   my %arg = @_ || ();
   my $parser_class = $arg{parser_class} || 'HTML::Parser';
-  eval "require $parser_class;" || die "require $parser_class failed: $@";
+  eval "require $parser_class" or die "require $parser_class failed: $@";
   @ISA = ($parser_class);
 
   $self->init(@_);
 
-  unless ($self->can('attr_encoded')) { 
-     die "attr_encoded method is missing. If are using HTML::Parser, you need at least version 3.26";
-  }
+  eval { $self->can('attr_encoded') }
+    or die "attr_encoded method is missing. If are using HTML::Parser, you " .
+           "need at least version 3.26";
 
   # tell HTML::Parser not to decode attributes
   $self->attr_encoded(1);
 
   return $self;
 }
+
 
 # a few shortcuts to fill()
 sub fill_file      { my $self = shift; return $self->fill('file'     ,@_); }
@@ -43,23 +44,24 @@ sub fill_scalarref { my $self = shift; return $self->fill('scalarref',@_); }
 
 # track the keys we support. Useful for file-name detection.
 sub _known_keys {
-    return {
-        scalarref      =>  1,
-        arrayref       =>  1,
-        fdat           =>  1,
-        fobject        =>  1,
-        file           =>  1,
-        target         =>  1,
-        fill_password  =>  1,
-        ignore_fields  =>  1,
-        disable_fields =>  1,
-        invalid_fields =>  1,
-        invalid_class  =>  1,
-    }
+  return {
+    scalarref      =>  1,
+    arrayref       =>  1,
+    fdat           =>  1,
+    fobject        =>  1,
+    file           =>  1,
+    target         =>  1,
+    fill_password  =>  1,
+    ignore_fields  =>  1,
+    disable_fields =>  1,
+    invalid_fields =>  1,
+    invalid_class  =>  1,
+  }
 }
 
+
 sub fill {
-   my $self = shift;
+  my $self = shift;
 
   # If we are called as a class method, go ahead and call new().
   $self = $self->new if (not ref $self);
@@ -68,76 +70,64 @@ sub fill {
 
   # If the first arg is a scalarref, translate that to scalarref => $first_arg
   if (ref $_[0] eq 'SCALAR') {
-      $option{scalarref} = shift;
-  }
-  elsif (ref $_[0] eq 'ARRAY') {
-      $option{arrayref} = shift;
-  }
-  elsif (ref $_[0] eq 'GLOB') {
-      $option{file} = shift;
-  }
-  elsif (ref $_[0]) {
+    $option{scalarref} = shift;
+  } elsif (ref $_[0] eq 'ARRAY') {
+    $option{arrayref} = shift;
+  } elsif (ref $_[0] eq 'GLOB') {
+    $option{file} = shift;
+  } elsif (ref $_[0]) {
     croak "data source is not a reference type we understand";
   }
   # Last chance, if the first arg isn't one of the known keys, we 
   # assume it is a file name.
   elsif (not _known_keys()->{$_[0]} )  {
     $option{file} =  shift;
+  } else {
+    # Should be a known key. Nothing to do.
   }
-  else {
-      # Should be a known key. Nothing to do.
-  }
-
 
   # Now, check to see if the next arg is also a reference. 
   my $data;
   if (ref $_[0]) {
-      $data = shift;
-      $data = [$data] unless ref $data eq 'ARRAY';
+    $data = shift;
+    $data = [$data] unless ref $data eq 'ARRAY';
 
-      for my $source (@$data) {
-          if (ref $source eq 'HASH') {
-              push @{ $option{fdat} }, $source;
-          }
-          elsif (ref $source) {
-              if ($source->can('param')) {
-                  push @{ $option{fobject} }, $source;
-              }
-              else {
-                  croak "data source $source does not supply a param method";
-              }
-          }
-          elsif (defined $source) {
-              croak "data source $source is not a hash or object reference";
-          }
+    for my $source (@$data) {
+      if (ref $source eq 'HASH') {
+        push @{ $option{fdat} }, $source;
+      } elsif (ref $source) {
+        if (eval { $source->can('param') }) {
+          push @{ $option{fobject} }, $source;
+        } else {
+          croak "data source $source does not supply a param method";
+        }
+      } elsif (defined $source) {
+        croak "data source $source is not a hash or object reference";
       }
-
+    }
   }
-
  
   # load in the rest of the options
   %option = (%option, @_);
 
-
   # As suggested in the docs, merge multiple fdats into one. 
   if (ref $option{fdat} eq 'ARRAY') {
-      my %merged;
-      for my $hash (@{ $option{fdat} }) {
-          for my $key (keys %$hash) {
-              $merged{$key} = $hash->{$key};
-          }
+    my %merged;
+    for my $hash (@{ $option{fdat} }) {
+      for my $key (keys %$hash) {
+        $merged{$key} = $hash->{$key};
       }
-      $option{'fdat'} = \%merged;
+    }
+    $option{fdat} = \%merged;
   }
 
-
   my %ignore_fields;
-  %ignore_fields = map { $_ => 1 } ( ref $option{'ignore_fields'} eq 'ARRAY' )
+  %ignore_fields = map { $_ => 1 } ( ref $option{ignore_fields} eq 'ARRAY' )
     ? @{ $option{ignore_fields} } : $option{ignore_fields} if exists( $option{ignore_fields} );
   $self->{ignore_fields} = \%ignore_fields;
 
   my %disable_fields;
-  %disable_fields = map { $_ => 1 } ( ref $option{'disable_fields'} eq 'ARRAY' )
+  %disable_fields = map { $_ => 1 } ( ref $option{disable_fields} eq 'ARRAY' )
     ? @{ $option{disable_fields} } : $option{disable_fields} if exists( $option{disable_fields} );
   $self->{disable_fields} = \%disable_fields;
 
@@ -146,7 +136,7 @@ sub fill {
     ? @{ $option{invalid_fields} } : $option{invalid_fields} if exists( $option{invalid_fields} );
   $self->{invalid_fields} = \%invalid_fields;
 
-  if (my $fdat = $option{fdat}){
+  if (my $fdat = $option{fdat}) {
     # Copy the structure to prevent side-effects.
     my %copy;
     keys %$fdat; # reset fdat if each or Dumper was called on fdat
@@ -160,29 +150,32 @@ sub fill {
   # We want the reference to these objects to go out of scope at the
   # end of the method.
   local $self->{objects} = [];
-  if(my $objects = $option{fobject}){
-    unless(ref($objects) eq 'ARRAY'){
+  if (my $objects = $option{fobject}) {
+    unless (ref($objects) eq 'ARRAY') {
       $objects = [ $objects ];
     }
-    for my $object (@$objects){
+    for my $object (@$objects) {
       # make sure objects in 'param_object' parameter support param()
-      defined($object->can('param')) or
-	croak("HTML::FillInForm->fill called with fobject option, containing object of type " . ref($object) . " which lacks a param() method!");
+      eval { $object->can('param') } or
+        croak "HTML::FillInForm->fill called with fobject option, " .
+              "containing object of type " . ref($object) . " which " .
+              "lacks a param() method!";
     }
 
     $self->{objects} = $objects;
   }
-  if (my $target = $option{target}){
-    $self->{'target'} = $target;
+
+  if (my $target = $option{target}) {
+    $self->{target} = $target;
   }
 
-  if (my $invalid_class = $option{invalid_class}){
-    $self->{'invalid_class'} = $invalid_class;
+  if (my $invalid_class = $option{invalid_class}) {
+    $self->{invalid_class} = $invalid_class;
   } else {
-    $self->{'invalid_class'} = 'invalid';
+    $self->{invalid_class} = 'invalid';
   }
 
-  if (defined($option{fill_password})){
+  if (defined($option{fill_password})) {
     $self->{fill_password} = $option{fill_password};
   } else {
     $self->{fill_password} = 1;
@@ -191,18 +184,20 @@ sub fill {
   $self->{clear_absent_checkboxes} = $option{clear_absent_checkboxes};
 
   # make sure method has data to fill in HTML form with!
-  unless(exists $self->{fdat} || $self->{objects}){
-    croak("HTML::FillInForm->fillInForm() called without 'fobject' or 'fdat' parameter set");
+  unless (exists $self->{fdat} || $self->{objects}) {
+    croak "HTML::FillInForm->fillInForm() called without 'fobject' or " .
+          "'fdat' parameter set";
   }
 
+  # XXX why local?
   local $self->{object_param_cache};
 
-  if(my $file = $option{file}){
+  if (my $file = $option{file}) {
     $self->parse_file($file);
-  } elsif (my $scalarref = $option{scalarref}){
+  } elsif (my $scalarref = $option{scalarref}) {
     $self->parse($$scalarref);
-  } elsif (my $arrayref = $option{arrayref}){
-    for (@$arrayref){
+  } elsif (my $arrayref = $option{arrayref}) {
+    for (@$arrayref) {
       $self->parse($_);
     }
   }
@@ -211,275 +206,312 @@ sub fill {
   return delete $self->{output};
 }
 
-# handles opening HTML tags such as <input ...>
-sub start {
-  my ($self, $tagname, $attr, $attrseq, $origtext) = @_;
-
-  # set the current form
-  if ($tagname eq 'form') {
-    $self->{object_param_cache} = {};
-    if (exists $attr->{'name'} || exists $attr->{'id'}) {
-      $self->{'current_form'} = $attr->{'name'} || $attr->{'id'};
-    } else {
-      # in case of previous one without </FORM>
-      delete $self->{'current_form'};
-    }
-  }
-
-  # This form is not my target.
-  if (exists $self->{'target'} &&
-      (! exists $self->{'current_form'} ||
-       $self->{'current_form'} ne $self->{'target'})) {
-    $self->{'output'} .= $origtext;
-    return;
-  }
-  
-  # HTML::Parser converts tagname to lowercase, so we don't need /i
-  if ($self->{option_no_value}) {
-    $self->{output} .= '>';
-    delete $self->{option_no_value};
-  }
-
-  # Check if we need to disable this field
-  $attr->{disabled} = 'disabled'
-    if exists $attr->{'name'} and
-    exists $self->{disable_fields}{ $attr->{'name'} } and
-    $self->{disable_fields}{ $attr->{'name'} } and
-    not ( exists $attr->{disabled} and $attr->{disabled} );
-
-  # Check if we need to invalidate this field
-  my $invalidating = 0;
-  if (exists $attr->{name} and
-      exists $self->{invalid_fields}{ $attr->{name} } and
-      $self->{invalid_fields}{ $attr->{name} }) {
-      $invalidating = 1;
-      if (exists $attr->{class} and length $attr->{class}) {
-          # don't add the class if it's already there
-          unless ($attr->{class} =~ /\b\Q$self->{invalid_class}\E\b/) {
-              $attr->{class} .= " $self->{invalid_class}";
-          }
-      } else {
-          $attr->{class} = $self->{invalid_class};
-      }
-  }
-
-  if ($tagname eq 'input'){
-    my $value = exists $attr->{'name'} ? $self->_get_param($attr->{'name'}) : undef;
-    # force hidden fields to have a value
-    $value = '' if exists($attr->{'type'}) && $attr->{'type'} eq 'hidden' && ! exists $attr->{'value'} && ! defined $value;
-
-    # browsers do not pass unchecked checkboxes at all, so hack around
-    $value = '' if $self->{clear_absent_checkboxes} && !defined $value && exists($attr->{'type'}) && ($attr->{'type'} eq 'checkbox' || $attr->{'type'} eq 'radio');
-    if (defined($value)){
-      # check for input type, noting that default type is text
-      if (!exists $attr->{'type'} ||
-	  $attr->{'type'} =~ /^(text|textfield|hidden|tel|search|url|email|datetime|date|month|week|time|datetime\-local|number|range|color|)$/i){
-	if ( ref($value) eq 'ARRAY' ) {
-	  $value = shift @$value;
-	  $value = '' unless defined $value;
-        }
-	$attr->{'value'} = __escapeHTML($value);
-      } elsif (lc $attr->{'type'} eq 'password' && $self->{fill_password}) {
-	if ( ref($value) eq 'ARRAY' ) {
-	  $value = shift @$value;
-	  $value = '' unless defined $value;
-        }
-	$attr->{'value'} = __escapeHTML($value);
-      } elsif (lc $attr->{'type'} eq 'radio'){
-	if ( ref($value) eq 'ARRAY' ) {
-	  $value = $value->[0];
-	  $value = '' unless defined $value;
-        }
-	# value for radio boxes default to 'on', works with netscape
-	$attr->{'value'} = 'on' unless exists $attr->{'value'};
-	if ($attr->{'value'} eq __escapeHTML($value)){
-	  $attr->{'checked'} = 'checked';
-	} else {
-	  delete $attr->{'checked'};
-	}
-      } elsif (lc $attr->{'type'} eq 'checkbox'){
-	# value for checkboxes default to 'on', works with netscape
-	$attr->{'value'} = 'on' unless exists $attr->{'value'};
-
-	delete $attr->{'checked'}; # Everything is unchecked to start
-        $value = [ $value ] unless ref($value) eq 'ARRAY';
-	foreach my $v ( @$value ) {
-	  if ( $attr->{'value'} eq __escapeHTML($v) ) {
-	    $attr->{'checked'} = 'checked';
-	  }
-	}
-#      } else {
-#	warn(qq(Input field of unknown type "$attr->{type}": $origtext));
-      }
-    }
-    $self->{output} .= "<$tagname";
-    while (my ($key, $value) = each %$attr) {
-      next if $key eq '/';
-      $self->{output} .= sprintf qq( %s="%s"), $key, $value;
-    }
-    # extra space put here to work around Opera 6.01/6.02 bug
-    $self->{output} .= ' /' if $attr->{'/'};
-    $self->{output} .= ">";
-  } elsif ($tagname eq 'option'){
-    my $value = $self->_get_param($self->{selectName});
-
-    # browsers do not pass selects with no selected options at all,
-    # so hack around
-    $value = '' if $self->{clear_absent_checkboxes} && !defined $value;
-
-    $value = [ $value ] unless ( ref($value) eq 'ARRAY' );
-
-    if ( defined $value->[0] ){
-      delete $attr->{selected} if exists $attr->{selected};
-      
-      if(defined($attr->{'value'})){
-        # option tag has value attr - <OPTION VALUE="foo">bar</OPTION>
-        
-        if ($self->{selectMultiple}){
-          # check if the option tag belongs to a multiple option select
-	  foreach my $v ( grep { defined } @$value ) {
-	    if ( $attr->{'value'} eq __escapeHTML($v) ){
-	      $attr->{selected} = 'selected';
-	    }
-          }
-        } else {
-          # if not every value of a fdat ARRAY belongs to a different select tag
-          if (not $self->{selectSelected}){
-	    if ( $attr->{'value'} eq __escapeHTML($value->[0])){
-	      shift @$value if ref($value) eq 'ARRAY';
-	      $attr->{selected} = 'selected';
-              $self->{selectSelected} = 1; # remeber that an option tag is selected for this select tag
-	    }
-          }
-        }
-      } else {
-        # option tag has no value attr - <OPTION>bar</OPTION>
-	# save for processing under text handler
-	$self->{option_no_value} = __escapeHTML($value);
-      }
-    }
-    $self->{output} .= "<$tagname";
-    while (my ($key, $value) = each %$attr) {
-      $self->{output} .= sprintf qq( %s="%s"), $key, $value;
-    }
-    unless ($self->{option_no_value}){
-      # we can close option tag here
-      $self->{output} .= ">";
-    }
-  } elsif ($tagname eq 'textarea'){
-    # need to re-output the <textarea> if we're marking it invalid
-    # (doesn't disable need this too?)
-    if ($invalidating) {
-        $self->{output} .= "<$tagname";
-        while (my ($key, $value) = each %$attr) {
-            $self->{output} .= sprintf qq( %s="%s"), $key, $value;
-        }
-        $self->{output} .= ">";
-    } else {
-        $self->{output} .= $origtext;
-    }
-
-    if ($attr->{'name'} and defined (my $value = $self->_get_param($attr->{'name'}))){
-      $value = (shift @$value || '') if ref($value) eq 'ARRAY';
-      # <textarea> foobar </textarea> -> <textarea> $value </textarea>
-      # we need to set outputText to 'no' so that 'foobar' won't be printed
-      $self->{outputText} = 'no';
-      $self->{output} .= __escapeHTML($value);
-    }
-
-  } elsif ($tagname eq 'select'){
-    $self->{selectName} = $attr->{'name'};
-    if (defined $attr->{'multiple'}){
-      $self->{selectMultiple} = 1; # helper var to remember if the select tag has the multiple attr set or not
-    } else {
-      $self->{selectMultiple} = 0;
-      $self->{selectSelected} = 0; # helper var to remember if an option was already selected in the current select tag
-    }
-
-    # need to re-output the <select> if we're marking it invalid
-    # (doesn't disable need this too?)
-    if ($invalidating) {
-        $self->{output} .= "<$tagname";
-        while (my ($key, $value) = each %$attr) {
-            $self->{output} .= sprintf qq( %s="%s"), $key, $value;
-        }
-        $self->{output} .= ">";
-    } else {
-        $self->{output} .= $origtext;
-    }
-  } else {
-    $self->{output} .= $origtext;
-  }
-}
 
 sub _get_param {
   my ($self, $param) = @_;
 
-  return undef if $self->{ignore_fields}{$param};
+  return undef if $self->{ignore_fields}{ $param };
 
-  return $self->{fdat}{$param} if exists $self->{fdat}{$param};
+  return $self->{fdat}{$param} if exists $self->{fdat}{ $param };
 
-  return $self->{object_param_cache}{$param} if exists $self->{object_param_cache}{$param};
+  return $self->{object_param_cache}{ $param }
+    if exists $self->{object_param_cache}{ $param };
 
   # traverse the list in reverse order for backwards compatibility
   # with the previous implementation.
-  for my $o (reverse @{$self->{objects}}) {
+  for my $o (reverse @{ $self->{objects} }) {
     my @v = $o->param($param);
-
     next unless @v;
 
-    return $self->{object_param_cache}{$param} = @v > 1 ? \@v : $v[0];
+    return $self->{object_param_cache}{ $param } = @v > 1 ? \@v : $v[0];
   }
 
   return undef;
 }
 
-# handles non-html text
-sub text {
-  my ($self, $origtext) = @_;
-  # just output text, unless replaced value of <textarea> tag
-  unless(exists $self->{outputText} && $self->{outputText} eq 'no'){
-    if(exists $self->{option_no_value}){
-      # dealing with option tag with no value - <OPTION>bar</OPTION>
-      my $values = $self->{option_no_value};
-      my $value = $origtext;
-      $value =~ s/^\s+//;
-      $value =~ s/\s+$//;
-      foreach my $v ( @$values ) {
-	if ( $value eq $v ) {
-	  $self->{output} .= ' selected="selected"';
+
+sub _output_tag {
+  my $self = shift;
+  my $tag = shift or croak "no tag supplied";
+
+  unless (ref $tag) {
+    $tag = $self->{open}{ $tag } or return;
+  }
+  my $attr = $tag->{attr} || {};
+
+  $self->{output} .= "<$tag->{tagname}";
+  while (my ($key, $value) = each %$attr) {
+    next if $key eq '/';
+    $self->{output} .= sprintf qq( %s="%s"), $key, $value;
+  }
+  # extra space put here to work around Opera 6.01/6.02 bug
+  $self->{output} .= ' /' if $attr->{'/'};
+  $self->{output} .= ">";
+
+  delete $self->{open}{ $tag->{tagname} };
+}
+
+
+my %form_tags = map { $_ => 1 } qw/ form input option select textarea /;
+
+# we handle these input tags specially
+my %special_input_type = map { $_ => 1 } qw/
+  password radio checkbox
+/;
+
+# handles opening HTML tags such as <input ...>
+sub start {
+  my ($self, $tagname, $attr, $attrseq, $origtext) = @_;
+
+  # If not a form tag, append original content and return immediately
+  unless (exists $form_tags{ $tagname }) {
+    $self->{output} .= $origtext;
+    return;
+  }
+
+  # set the current form
+  if ($tagname eq 'form') {
+    $self->{object_param_cache} = {};
+
+    delete $self->{current_form}; # in case previous one without </form>
+    if (exists $attr->{name} || exists $attr->{id}) {
+      $self->{current_form} = $attr->{name} || $attr->{id};
+    }
+
+    $self->{output} .= $origtext;
+    return;
+  }
+
+  # This is not the form we're looking for
+  if (exists $self->{target} &&
+       (! exists $self->{current_form} ||
+       $self->{current_form} ne $self->{target})) {
+    $self->{output} .= $origtext;
+    return;
+  }
+
+  # If an option tag is still open, close it before handling the new tag
+  $self->_output_tag('option') if $self->{open}{option};
+
+  # We keep track of all the open tags to coordinate between callbacks
+  my $tag = { tagname => $tagname, attr => $attr, origtext => $origtext };
+  $self->{open}{ $tagname } = $tag;
+
+  # Check if we need to disable this field
+  if (exists $attr->{name} &&
+      exists $self->{disable_fields}{ $attr->{name} } &&
+      $self->{disable_fields}{ $attr->{name} } &&
+      not (exists $attr->{disabled} and $attr->{disabled})) {
+
+    $attr->{disabled} = 'disabled';
+    $tag->{has_changed} = 1;
+  }
+
+  # Check if we need to invalidate this field
+  if (exists $attr->{name} && 
+      exists $self->{invalid_fields}{ $attr->{name} } &&
+      $self->{invalid_fields}{ $attr->{name} }) {
+
+    if (exists $attr->{class} && length $attr->{class}) {
+      # don't add the class if it's already there
+      unless ($attr->{class} =~ /\b\Q$self->{invalid_class}\E\b/) {
+        $attr->{class} .= " $self->{invalid_class}";
+      }
+    } else {
+      $attr->{class} = $self->{invalid_class};
+    }
+
+    $tag->{has_changed} = 1;
+  }
+
+  if ($tagname eq 'input') {
+    my $value = exists $attr->{name} 
+                  ? $self->_get_param($attr->{name}) : undef;
+
+    if (exists $attr->{type} and not defined $value) {
+      # force hidden fields to have a value
+      if ($attr->{type} eq 'hidden') {
+        $value = '' unless exists $attr->{value};
+      }
+
+      # browsers do not pass unchecked checkboxes at all, so hack around
+      if ($attr->{type} eq 'checkbox' || $attr->{type} eq 'radio') {
+        $value = '' if $self->{clear_absent_checkboxes};
+      }
+    }
+
+    if (!defined $value and !$tag->{has_changed}) {
+      $self->{output} .= $origtext;
+      return;
+    }
+
+    if (defined($value)) {
+      my $type = defined $attr->{type} ? lc $attr->{type} : 'text';
+
+      if (!$special_input_type{ $type }) {
+        $value = shift @$value if ref $value eq 'ARRAY';
+        $attr->{value} = __escapeHTML(defined $value ? $value : '');
+      } elsif ($type eq 'password' && $self->{fill_password}) {
+        $value = shift @$value if ref $value eq 'ARRAY';
+        $attr->{value} = __escapeHTML(defined $value ? $value : '');
+      } elsif ($type eq 'radio') {
+        $value = $value->[0] if ref $value eq 'ARRAY';
+        $value = '' unless defined $value;
+
+        # value for radio boxes default to 'on', works with netscape
+        $attr->{value} = 'on' unless exists $attr->{value};
+        if ($attr->{value} eq __escapeHTML($value)) {
+          $attr->{checked} = 'checked';
+        } else {
+          delete $attr->{checked};
+        }
+      } elsif ($type eq 'checkbox') {
+        # value for checkboxes default to 'on', works with netscape
+        $attr->{value} = 'on' unless exists $attr->{value};
+
+        delete $attr->{checked}; # Everything is unchecked to start
+        $value = [ $value ] unless ref $value eq 'ARRAY';
+        foreach my $v (@$value) {
+          if ($attr->{value} eq __escapeHTML($v)) {
+            $attr->{checked} = 'checked';
+            last;
+          }
         }
       }
-      # close <OPTION> tag
-      $self->{output} .= ">$origtext";
-      delete $self->{option_no_value};
+    }
+
+    $self->_output_tag($tag);
+  } elsif ($tagname eq 'select') {
+    my $value = $self->_get_param($tag->{attr}{name});
+    # browsers do not pass selects with no selected options at all,
+    # so hack around
+    $value = '' if $self->{clear_absent_checkboxes} && !defined $value;
+    # save selected values for use in option tags
+    $tag->{escaped_values} = [
+      map { __escapeHTML($_) }
+      grep { defined }
+      map { ref $value eq 'ARRAY' ? @$_ : $_ }
+      $value
+    ];
+
+    if ($tag->{has_changed}) {
+      $self->_output_tag($tag);
     } else {
       $self->{output} .= $origtext;
+    }
+  } elsif ($tagname eq 'option') {
+    my $select_tag = $self->{open}{select} || {};
+    my $select_name = $select_tag->{attr}{name};
+    my $values = $select_tag->{escaped_values} || [];
+
+    # If an option tag doesn't have a value attribute, the value of
+    # it's inner contents is used (e.g., <option>foo</option>).
+    # So in the case where a value has been selected, but there's no
+    # value attribute, we need to wait until we process the inner
+    # contents to know if a match exists.
+    my $keep_tag_open = @$values && !exists $attr->{value};
+
+    if (@$values) {
+      delete $attr->{selected} if exists $attr->{selected};
+ 
+      # if option tag has value attr - <OPTION VALUE="foo">bar</OPTION>
+      if (defined $attr->{value}) {
+        if (defined $select_tag->{attr}{multiple}) {
+          # check if the option tag belongs to a multiple option select
+          foreach my $v (@$values) {
+            if ($attr->{value} eq $v) {
+              $attr->{selected} = 'selected';
+              last;
+            }
+          }
+        } else {
+          # if not every value of a fdat ARRAY belongs to a different select tag
+          unless ($select_tag->{already_selected}) {
+            if ($attr->{value} eq $values->[0]) {
+              $attr->{selected} = 'selected';
+
+              # remember that an option was selected for this tag
+              $select_tag->{already_selected} = 1;
+            }
+          }
+        }
+      }
+    }
+
+    $self->_output_tag($tag) unless $keep_tag_open;
+  } elsif ($tagname eq 'textarea') {
+    if ($tag->{has_changed}) {
+      $self->_output_tag($tag);
+    } else {
+      $self->{output} .= $origtext;
+    }
+
+    if ($attr->{name} and
+        defined (my $value = $self->_get_param($attr->{name}))) {
+
+      # <textarea> foobar </textarea> -> <textarea> $value </textarea>
+      # we need to set outputText to 'no' so that 'foobar' won't be printed
+      $tag->{suppress_content} = 1;
+
+      # append the new textarea contents
+      $value = shift @$value if ref $value eq 'ARRAY';
+      $self->{output} .= __escapeHTML(defined $value ? $value : '');
     }
   }
 }
 
+
+# handles non-html text
+sub text {
+  my ($self, $origtext) = @_;
+
+  # if submitted textarea value has already been output, don't write
+  # the original contents
+  if (my $textarea = $self->{open}{textarea}) {
+    return if $textarea->{suppress_content};
+  }
+
+  # dealing with option tag with no value - <OPTION>bar</OPTION>
+  if (my $option = $self->{open}{option} and 
+      my $select = $self->{open}{select}) {
+    
+    my $selected_values = $select->{escaped_values};
+    
+    my $value = $origtext;
+    $value =~ s/^\s+|\s+$//g;
+
+    foreach my $v (@$selected_values) {
+      if ($value eq $v) {
+        $option->{attr}{selected} = 'selected';
+        last;
+      }
+    }
+
+    $self->_output_tag('option');
+  }
+
+  $self->{output} .= $origtext;
+}
+
+
 # handles closing HTML tags such as </textarea>
 sub end {
   my ($self, $tagname, $origtext) = @_;
-  if ($self->{option_no_value}) {
-    $self->{output} .= '>';
-    delete $self->{option_no_value};
-  }
-  if($tagname eq 'select'){
-    delete $self->{selectName};
-  } elsif ($tagname eq 'textarea'){
-    delete $self->{outputText};
-  } elsif ($tagname eq 'form') {
-    delete $self->{'current_form'};
-  }
+
+  $self->_output_tag('option') if $self->{open}{option};
+
+  delete $self->{current_form} if $tagname eq 'form';
+  delete $self->{open}{ $tagname };
+
   $self->{output} .= $origtext;
 }
+
 
 sub __escapeHTML {
   my ($toencode) = @_;
 
   return undef unless defined($toencode);
+
   $toencode =~ s/&/&amp;/g;
   $toencode =~ s/\"/&quot;/g;
   $toencode =~ s/>/&gt;/g;
@@ -487,37 +519,35 @@ sub __escapeHTML {
   return $toencode;
 }
 
+
 sub comment {
-    my ( $self, $text ) = @_;
-    # if it begins with '[if ' and doesn't end with '<![endif]'
-    # it's a "downlevel-revealed" conditional comment (stupid IE)
-    # or
-    # if it ends with '[endif]' then it's the end of a
-    # "downlevel-revealed" conditional comment
-    if(
-        (
-            ( index($text, '[if ') == 0 )
-            &&
-            ( $text !~ /<!\[endif\]$/ )
-        )
-        ||
-        ( $text eq '[endif]' )
-    ) {
-        $self->{output} .= '<!' . $text . '>';
-    } else {
-        $self->{output} .= '<!--' . $text . '-->';
-    }
+  my ($self, $text) = @_;
+
+  # if it begins with '[if ' and doesn't end with '<![endif]'
+  # it's a "downlevel-revealed" conditional comment (stupid IE)
+  # or
+  # if it ends with '[endif]' then it's the end of a
+  # "downlevel-revealed" conditional comment
+  if (
+      (
+        (index($text, '[if ') == 0) &&
+        ($text !~ /<!\[endif\]$/)
+      )
+      ||
+      ($text eq '[endif]')
+  ) {
+    $self->{output} .= "<!$text>";
+  } else {
+    $self->{output} .= "<!--$text-->";
+  }
 }
 
-sub process {
-  my ( $self, $token0, $text ) = @_;
-  $self->{output} .= $text;
-}
 
-sub declaration {
-  my ( $self, $text ) = @_;
-  $self->{output} .= '<!' . $text . '>';
-}
+sub process { $_[0]->{output} .= $_[2] }
+
+
+sub declaration { $_[0]->{output} .= "<!$_[1]>" }
+
 
 1;
 

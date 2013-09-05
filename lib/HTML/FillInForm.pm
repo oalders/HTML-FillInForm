@@ -372,6 +372,28 @@ sub start {
     # extra space put here to work around Opera 6.01/6.02 bug
     $self->{output} .= ' /' if $attr->{'/'};
     $self->{output} .= ">";
+  } elsif ($tagname eq 'select') {
+    my $value = $self->_get_param($tag->{attr}{name});
+    # browsers do not pass selects with no selected options at all,
+    # so hack around
+    $value = '' if $self->{clear_absent_checkboxes} && !defined $value;
+    $tag->{values} = [
+      grep { defined }
+      map { ref $value eq 'ARRAY' ? @$_ : $_ }
+      $value
+    ];
+
+    # need to re-output the <select> if we're marking it invalid
+    # (doesn't disable need this too?)
+    if ($tag->{has_changed}) {
+      $self->{output} .= "<$tagname";
+      while (my ($key, $value) = each %$attr) {
+        $self->{output} .= sprintf qq( %s="%s"), $key, $value;
+      }
+      $self->{output} .= ">";
+    } else {
+      $self->{output} .= $origtext;
+    }
   } elsif ($tagname eq 'option') {
     my $select_tag = $self->{open}{select} || {};
     my $select_name = $select_tag->{attr}{name};
@@ -435,28 +457,6 @@ sub start {
       # we need to set outputText to 'no' so that 'foobar' won't be printed
       $self->{open}{textarea}{suppress_content} = 1;
       $self->{output} .= __escapeHTML($value);
-    }
-  } elsif ($tagname eq 'select') {
-    my $value = $self->_get_param($tag->{attr}{name});
-    # browsers do not pass selects with no selected options at all,
-    # so hack around
-    $value = '' if $self->{clear_absent_checkboxes} && !defined $value;
-    $tag->{values} = [
-      grep { defined }
-      map { ref $value eq 'ARRAY' ? @$_ : $_ }
-      $value
-    ];
-
-    # need to re-output the <select> if we're marking it invalid
-    # (doesn't disable need this too?)
-    if ($tag->{has_changed}) {
-      $self->{output} .= "<$tagname";
-      while (my ($key, $value) = each %$attr) {
-        $self->{output} .= sprintf qq( %s="%s"), $key, $value;
-      }
-      $self->{output} .= ">";
-    } else {
-      $self->{output} .= $origtext;
     }
   }
 }

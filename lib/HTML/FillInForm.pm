@@ -9,7 +9,7 @@ use Carp; # generate better errors with more context
 # required for UNIVERSAL->can
 require 5.005;
 
-use vars qw($VERSION @ISA);
+use vars qw( $VERSION @ISA );
 $VERSION = '2.20';
 
 
@@ -26,15 +26,16 @@ sub new {
 
   $self->init(@_);
 
-  unless ($self->can('attr_encoded')) { 
-     die "attr_encoded method is missing. If are using HTML::Parser, you need at least version 3.26";
-  }
+  eval { $self->can('attr_encoded') }
+    or die "attr_encoded method is missing. If are using HTML::Parser, you " .
+           "need at least version 3.26";
 
   # tell HTML::Parser not to decode attributes
   $self->attr_encoded(1);
 
   return $self;
 }
+
 
 # a few shortcuts to fill()
 sub fill_file      { my $self = shift; return $self->fill('file'     ,@_); }
@@ -57,6 +58,7 @@ sub _known_keys {
     invalid_class  =>  1,
   }
 }
+
 
 sub fill {
   my $self = shift;
@@ -94,7 +96,7 @@ sub fill {
       if (ref $source eq 'HASH') {
         push @{ $option{fdat} }, $source;
       } elsif (ref $source) {
-        if ($source->can('param')) {
+        if (eval { $source->can('param') }) {
           push @{ $option{fobject} }, $source;
         } else {
           croak "data source $source does not supply a param method";
@@ -134,7 +136,7 @@ sub fill {
     ? @{ $option{invalid_fields} } : $option{invalid_fields} if exists( $option{invalid_fields} );
   $self->{invalid_fields} = \%invalid_fields;
 
-  if (my $fdat = $option{fdat}){
+  if (my $fdat = $option{fdat}) {
     # Copy the structure to prevent side-effects.
     my %copy;
     keys %$fdat; # reset fdat if each or Dumper was called on fdat
@@ -154,7 +156,7 @@ sub fill {
     }
     for my $object (@$objects) {
       # make sure objects in 'param_object' parameter support param()
-      defined($object->can('param')) or
+      eval { $object->can('param') } or
         croak "HTML::FillInForm->fill called with fobject option, " .
               "containing object of type " . ref($object) . " which " .
               "lacks a param() method!";
@@ -451,6 +453,7 @@ sub start {
   }
 }
 
+
 # handles non-html text
 sub text {
   my ($self, $origtext) = @_;
@@ -480,6 +483,7 @@ sub text {
   $self->{output} .= $origtext;
 }
 
+
 # handles closing HTML tags such as </textarea>
 sub end {
   my ($self, $tagname, $origtext) = @_;
@@ -492,6 +496,7 @@ sub end {
   $self->{output} .= $origtext;
 }
 
+
 sub __escapeHTML {
   my ($toencode) = @_;
 
@@ -503,6 +508,7 @@ sub __escapeHTML {
   return $toencode;
 }
 
+
 sub comment {
   my ( $self, $text ) = @_;
   # if it begins with '[if ' and doesn't end with '<![endif]'
@@ -512,28 +518,24 @@ sub comment {
   # "downlevel-revealed" conditional comment
   if (
       (
-          (index($text, '[if ') == 0)
-          &&
-          ($text !~ /<!\[endif\]$/)
+        (index($text, '[if ') == 0) &&
+        ($text !~ /<!\[endif\]$/)
       )
       ||
-      ( $text eq '[endif]' )
+      ($text eq '[endif]')
   ) {
-      $self->{output} .= '<!' . $text . '>';
+    $self->{output} .= "<!$text>";
   } else {
-      $self->{output} .= '<!--' . $text . '-->';
+    $self->{output} .= "<!--$text-->";
   }
 }
 
-sub process {
-  my ( $self, $token0, $text ) = @_;
-  $self->{output} .= $text;
-}
 
-sub declaration {
-  my ( $self, $text ) = @_;
-  $self->{output} .= '<!' . $text . '>';
-}
+sub process { $_[0]->{output} .= $_[2] }
+
+
+sub declaration { $_[0]->{output} .= "<!$_[1]>" }
+
 
 1;
 

@@ -228,9 +228,23 @@ sub _get_param {
 }
 
 
-sub _build_tag {
+sub _write_tag {
   my $self = shift;
-  my ($tagname, $attr, $attrseq, $origtext) = @_;
+  my $tag = shift or croak "no tag supplied";
+
+  $tag = $self->{open}{ $tag } || {} unless ref $tag;
+  my $attr = $tag->{attr} || {};
+
+  $self->{output} .= "<$tag->{tagname}";
+  while (my ($key, $value) = each %$attr) {
+    next if $key eq '/';
+    $self->{output} .= sprintf qq( %s="%s"), $key, $value;
+  }
+  # extra space put here to work around Opera 6.01/6.02 bug
+  $self->{output} .= ' /' if $attr->{'/'};
+  $self->{output} .= ">";
+
+  delete $self->{open}{ $tag->{tagname} };
 }
 
 
@@ -268,14 +282,11 @@ sub start {
   }
 
   # If an option tag is still open, close it before handling the new tag
-  if ($self->{open}{option}) {
-    $self->{output} .= '>';
-    delete $self->{open}{option};
-  }
+  $self->_write_tag('option') if $self->{open}{option};
 
   # $tag is a context hash for this tag. We keep track of all the open
   # tags to coordinate between callbacks.
-  my $tag = { attr => $attr, origtext => $origtext };
+  my $tag = { tagname => $tagname, attr => $attr, origtext => $origtext };
   $self->{open}{ $tagname } = $tag;
 
   # Check if we need to disable this field
@@ -364,14 +375,7 @@ sub start {
       }
     }
 
-    $self->{output} .= "<$tagname";
-    while (my ($key, $value) = each %$attr) {
-      next if $key eq '/';
-      $self->{output} .= sprintf qq( %s="%s"), $key, $value;
-    }
-    # extra space put here to work around Opera 6.01/6.02 bug
-    $self->{output} .= ' /' if $attr->{'/'};
-    $self->{output} .= ">";
+    $self->_write_tag($tag);
   } elsif ($tagname eq 'select') {
     my $value = $self->_get_param($tag->{attr}{name});
     # browsers do not pass selects with no selected options at all,
@@ -386,11 +390,7 @@ sub start {
     # need to re-output the <select> if we're marking it invalid
     # (doesn't disable need this too?)
     if ($tag->{has_changed}) {
-      $self->{output} .= "<$tagname";
-      while (my ($key, $value) = each %$attr) {
-        $self->{output} .= sprintf qq( %s="%s"), $key, $value;
-      }
-      $self->{output} .= ">";
+      $self->_write_tag($tag);
     } else {
       $self->{output} .= $origtext;
     }
@@ -400,8 +400,9 @@ sub start {
     my $select_multiple = defined $select_tag->{attr}{multiple} ? 1 : 0;
     my $values = $select_tag->{values};
 
-    my $close_tag = 0;
+    my $close_tag = 1; # XXX simple as possible?
     if (defined $values->[0]) {
+      $close_tag = 0;
       delete $attr->{selected} if exists $attr->{selected};
       
       if (defined $attr->{value}) {
@@ -430,23 +431,12 @@ sub start {
       }
     }
 
-    $self->{output} .= "<$tagname";
-    while (my ($key, $value) = each %$attr) {
-      $self->{output} .= sprintf ' %s="%s"', $key, $value;
-    }
-    if ($close_tag) {
-      $self->{output} .= ">";
-      delete $self->{open}{option};
-    }
+    $self->_write_tag($tag) if $close_tag;
   } elsif ($tagname eq 'textarea') {
     # need to re-output the <textarea> if we're marking it invalid
     # (doesn't disable need this too?)
     if ($tag->{has_changed}) {
-      $self->{output} .= "<$tagname";
-      while (my ($key, $value) = each %$attr) {
-        $self->{output} .= sprintf ' %s="%s"', $key, $value;
-      }
-      $self->{output} .= ">";
+      $self->_write_tag($tag);
     } else {
       $self->{output} .= $origtext;
     }
@@ -478,14 +468,13 @@ sub text {
 
     foreach my $v (@$values) {
       if ($value eq $v) {
-        $self->{output} .= ' selected="selected"';
+        $self->{open}{option}{attr}{selected} = 'selected';
         last;
       }
     }
 
-    # close <OPTION> tag
-    $self->{output} .= '>';
-    delete $self->{open}{option};
+    # close <option> tag
+    $self->_write_tag('option');
   }
 
   $self->{output} .= $origtext;
@@ -495,10 +484,7 @@ sub text {
 sub end {
   my ($self, $tagname, $origtext) = @_;
 
-  if ($self->{open}{option}) {
-    $self->{output} .= '>';
-    delete $self->{open}{option};
-  }
+  $self->_write_tag('option') if $self->{open}{option};
 
   delete $self->{current_form} if $tagname eq 'form';
   delete $self->{open}{ $tagname };

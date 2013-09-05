@@ -385,7 +385,7 @@ sub start {
     # browsers do not pass selects with no selected options at all,
     # so hack around
     $value = '' if $self->{clear_absent_checkboxes} && !defined $value;
-    # squirrel away values array for use in option tags
+    # save selected values for use in option tags
     $tag->{escaped_values} = [
       map { __escapeHTML($_) }
       grep { defined }

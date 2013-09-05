@@ -230,20 +230,12 @@ sub _get_param {
 }
 
 
-sub _tag {
-  my $self = shift;
-  my $tagname = shift or croak "no tag name supplied";
-
-  return $self->{open}{ $tagname };
-}
-
-
 sub _write_tag {
   my $self = shift;
   my $tag = shift or croak "no tag supplied";
 
   unless (ref $tag) {
-    $tag = $self->_tag($tag) or return;
+    $tag = $self->{open}{ $tag } or return;
   }
   my $attr = $tag->{attr} || {};
 
@@ -294,7 +286,7 @@ sub start {
   }
 
   # If an option tag is still open, close it before handling the new tag
-  $self->_write_tag('option') if $self->_tag('option');
+  $self->_write_tag('option') if $self->{open}{option};
 
   # $tag is a context hash for this tag. We keep track of all the open
   # tags to coordinate between callbacks.
@@ -407,7 +399,7 @@ sub start {
       $self->{output} .= $origtext;
     }
   } elsif ($tagname eq 'option') {
-    my $select_tag = $self->_tag('select') || {};
+    my $select_tag = $self->{open}{select} || {};
     my $select_name = $select_tag->{attr}{name};
     my $select_multiple = defined $select_tag->{attr}{multiple} ? 1 : 0;
     my $values = $select_tag->{values};
@@ -470,19 +462,22 @@ sub text {
 
   # if submitted textarea value has already been output, don't write
   # the original contents
-  my $textarea = $self->_tag('textarea');
-  return if $textarea && $textarea->{suppress_content};
+  if (my $textarea = $self->{open}{textarea}) {
+    return if $textarea->{suppress_content};
+  }
 
   # dealing with option tag with no value - <OPTION>bar</OPTION>
-  if ($self->_tag('option') and my $select_tag = $self->_tag('select')) {
-    my $values = $select_tag->{values};
+  if (my $option = $self->{open}{option} and 
+      my $select = $self->{open}{select}) {
+    
+    my $selected_values = $select->{values};
     
     my $value = $origtext;
     $value =~ s/^\s+|\s+$//g;
 
-    foreach my $v (@$values) {
+    foreach my $v (@$selected_values) {
       if ($value eq $v) {
-        $self->{open}{option}{attr}{selected} = 'selected';
+        $option->{attr}{selected} = 'selected';
         last;
       }
     }

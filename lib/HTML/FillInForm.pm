@@ -242,7 +242,9 @@ sub _write_tag {
   my $self = shift;
   my $tag = shift or croak "no tag supplied";
 
-  $tag = $self->_tag($tag) || {} unless ref $tag;
+  unless (ref $tag) {
+    $tag = $self->_tag($tag) or return;
+  }
   my $attr = $tag->{attr} || {};
 
   $self->{output} .= "<$tag->{tagname}";

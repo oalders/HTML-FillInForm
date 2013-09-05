@@ -155,7 +155,9 @@ sub fill {
     for my $object (@$objects) {
       # make sure objects in 'param_object' parameter support param()
       defined($object->can('param')) or
-        croak("HTML::FillInForm->fill called with fobject option, containing object of type " . ref($object) . " which lacks a param() method!");
+        croak "HTML::FillInForm->fill called with fobject option, " .
+              "containing object of type " . ref($object) . " which " .
+              "lacks a param() method!";
     }
 
     $self->{objects} = $objects;
@@ -201,6 +203,30 @@ sub fill {
   $self->eof;
   return delete $self->{output};
 }
+
+
+sub _get_param {
+  my ($self, $param) = @_;
+
+  return undef if $self->{ignore_fields}{ $param };
+
+  return $self->{fdat}{$param} if exists $self->{fdat}{ $param };
+
+  return $self->{object_param_cache}{ $param }
+    if exists $self->{object_param_cache}{ $param };
+
+  # traverse the list in reverse order for backwards compatibility
+  # with the previous implementation.
+  for my $o (reverse @{ $self->{objects} }) {
+    my @v = $o->param($param);
+    next unless @v;
+
+    return $self->{object_param_cache}{ $param } = @v > 1 ? \@v : $v[0];
+  }
+
+  return undef;
+}
+
 
 sub _build_tag {
   my $self = shift;
@@ -279,7 +305,7 @@ sub start {
     $tag->{has_changed} = 1;
   }
 
-  if ($tagname eq 'input'){
+  if ($tagname eq 'input') {
     my $value = exists $attr->{name} 
                   ? $self->_get_param($attr->{name}) : undef;
 
@@ -346,37 +372,32 @@ sub start {
     # extra space put here to work around Opera 6.01/6.02 bug
     $self->{output} .= ' /' if $attr->{'/'};
     $self->{output} .= ">";
-  } elsif ($tagname eq 'option'){
-    my $select_tag = $self->{open}{select};
+  } elsif ($tagname eq 'option') {
+    my $select_tag = $self->{open}{select} || {};
     my $select_name = $select_tag->{attr}{name};
-    my $select_multiple = defined $select_tag->{attr}{multiple};
+    my $select_multiple = defined $select_tag->{attr}{multiple} ? 1 : 0;
+    my $values = $select_tag->{values};
 
-    my $value = $self->_get_param( $select_name );
-    # browsers do not pass selects with no selected options at all,
-    # so hack around
-    $value = '' if $self->{clear_absent_checkboxes} && !defined $value;
-    $value = [ $value ] unless ( ref($value) eq 'ARRAY' );
-
-    if (defined $value->[0]) {
+    my $close_tag = 0;
+    if (defined $values->[0]) {
       delete $attr->{selected} if exists $attr->{selected};
       
-      if (defined($attr->{'value'})) {
+      if (defined $attr->{value}) {
+        $close_tag = 1;
         # option tag has value attr - <OPTION VALUE="foo">bar</OPTION>
         
         if ($select_multiple) {
           # check if the option tag belongs to a multiple option select
-          foreach my $v (grep { defined } @$value) {
-            if ($attr->{'value'} eq __escapeHTML($v)) {
+          foreach my $v (grep { defined } @$values) {
+            if ($attr->{value} eq __escapeHTML($v)) {
               $attr->{selected} = 'selected';
               last;
             }
           }
         } else {
           # if not every value of a fdat ARRAY belongs to a different select tag
-          my $select_tag = $self->{open}{select};
-          if ($select_tag && !$select_tag->{already_selected}) {
-            if ($attr->{'value'} eq __escapeHTML($value->[0])) {
-              shift @$value if ref($value) eq 'ARRAY';
+          unless ($select_tag->{already_selected}) {
+            if ($attr->{value} eq __escapeHTML($values->[0])) {
               $attr->{selected} = 'selected';
 
               # remember that an option was selected for this tag
@@ -384,31 +405,28 @@ sub start {
             }
           }
         }
-      } else {
-        # option tag has no value attr - <OPTION>bar</OPTION>
-        # save for processing under text handler
-        $self->{option_no_value} = __escapeHTML($value);
       }
     }
+
     $self->{output} .= "<$tagname";
     while (my ($key, $value) = each %$attr) {
-      $self->{output} .= sprintf qq( %s="%s"), $key, $value;
+      $self->{output} .= sprintf ' %s="%s"', $key, $value;
     }
-    unless ($self->{option_no_value}) {
-      # we can close option tag here
+    if ($close_tag) {
       $self->{output} .= ">";
+      delete $self->{open}{option};
     }
   } elsif ($tagname eq 'textarea') {
     # need to re-output the <textarea> if we're marking it invalid
     # (doesn't disable need this too?)
     if ($tag->{has_changed}) {
-        $self->{output} .= "<$tagname";
-        while (my ($key, $value) = each %$attr) {
-            $self->{output} .= sprintf qq( %s="%s"), $key, $value;
-        }
-        $self->{output} .= ">";
+      $self->{output} .= "<$tagname";
+      while (my ($key, $value) = each %$attr) {
+        $self->{output} .= sprintf ' %s="%s"', $key, $value;
+      }
+      $self->{output} .= ">";
     } else {
-        $self->{output} .= $origtext;
+      $self->{output} .= $origtext;
     }
 
     if ($attr->{'name'} and defined (my $value = $self->_get_param($attr->{'name'}))) {
@@ -419,6 +437,16 @@ sub start {
       $self->{output} .= __escapeHTML($value);
     }
   } elsif ($tagname eq 'select') {
+    my $value = $self->_get_param($tag->{attr}{name});
+    # browsers do not pass selects with no selected options at all,
+    # so hack around
+    $value = '' if $self->{clear_absent_checkboxes} && !defined $value;
+    $tag->{values} = [
+      grep { defined }
+      map { ref $value eq 'ARRAY' ? @$_ : $_ }
+      $value
+    ];
+
     # need to re-output the <select> if we're marking it invalid
     # (doesn't disable need this too?)
     if ($tag->{has_changed}) {
@@ -430,31 +458,7 @@ sub start {
     } else {
       $self->{output} .= $origtext;
     }
-  } else {
-    $self->{output} .= $origtext;
   }
-}
-
-sub _get_param {
-  my ($self, $param) = @_;
-
-  return undef if $self->{ignore_fields}{ $param };
-
-  return $self->{fdat}{$param} if exists $self->{fdat}{ $param };
-
-  return $self->{object_param_cache}{ $param }
-    if exists $self->{object_param_cache}{ $param };
-
-  # traverse the list in reverse order for backwards compatibility
-  # with the previous implementation.
-  for my $o (reverse @{ $self->{objects} }) {
-    my @v = $o->param($param);
-    next unless @v;
-
-    return $self->{object_param_cache}{ $param } = @v > 1 ? \@v : $v[0];
-  }
-
-  return undef;
 }
 
 # handles non-html text
@@ -466,7 +470,9 @@ sub text {
   return if $textarea && $textarea->{suppress_content};
 
   # dealing with option tag with no value - <OPTION>bar</OPTION>
-  if (my $values = $self->{option_no_value}) {
+  if ($self->{open}{option} and my $select_tag = $self->{open}{select}) {
+    my $values = $select_tag->{values};
+    
     my $value = $origtext;
     $value =~ s/^\s+|\s+$//g;
 
@@ -479,7 +485,7 @@ sub text {
 
     # close <OPTION> tag
     $self->{output} .= '>';
-    delete $self->{option_no_value};
+    delete $self->{open}{option};
   }
 
   $self->{output} .= $origtext;
@@ -489,9 +495,9 @@ sub text {
 sub end {
   my ($self, $tagname, $origtext) = @_;
 
-  if ($self->{option_no_value}) {
+  if ($self->{open}{option}) {
     $self->{output} .= '>';
-    delete $self->{option_no_value};
+    delete $self->{open}{option};
   }
 
   delete $self->{current_form} if $tagname eq 'form';
@@ -520,9 +526,9 @@ sub comment {
   # "downlevel-revealed" conditional comment
   if (
       (
-          ( index($text, '[if ') == 0 )
+          (index($text, '[if ') == 0)
           &&
-          ( $text !~ /<!\[endif\]$/ )
+          ($text !~ /<!\[endif\]$/)
       )
       ||
       ( $text eq '[endif]' )

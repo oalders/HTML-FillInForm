@@ -43,23 +43,23 @@ sub fill_scalarref { my $self = shift; return $self->fill('scalarref',@_); }
 
 # track the keys we support. Useful for file-name detection.
 sub _known_keys {
-    return {
-        scalarref      =>  1,
-        arrayref       =>  1,
-        fdat           =>  1,
-        fobject        =>  1,
-        file           =>  1,
-        target         =>  1,
-        fill_password  =>  1,
-        ignore_fields  =>  1,
-        disable_fields =>  1,
-        invalid_fields =>  1,
-        invalid_class  =>  1,
-    }
+  return {
+    scalarref      =>  1,
+    arrayref       =>  1,
+    fdat           =>  1,
+    fobject        =>  1,
+    file           =>  1,
+    target         =>  1,
+    fill_password  =>  1,
+    ignore_fields  =>  1,
+    disable_fields =>  1,
+    invalid_fields =>  1,
+    invalid_class  =>  1,
+  }
 }
 
 sub fill {
-   my $self = shift;
+  my $self = shift;
 
   # If we are called as a class method, go ahead and call new().
   $self = $self->new if (not ref $self);
@@ -69,67 +69,55 @@ sub fill {
   # If the first arg is a scalarref, translate that to scalarref => $first_arg
   if (ref $_[0] eq 'SCALAR') {
       $option{scalarref} = shift;
-  }
-  elsif (ref $_[0] eq 'ARRAY') {
+  } elsif (ref $_[0] eq 'ARRAY') {
       $option{arrayref} = shift;
-  }
-  elsif (ref $_[0] eq 'GLOB') {
+  } elsif (ref $_[0] eq 'GLOB') {
       $option{file} = shift;
-  }
-  elsif (ref $_[0]) {
+  } elsif (ref $_[0]) {
     croak "data source is not a reference type we understand";
   }
   # Last chance, if the first arg isn't one of the known keys, we 
   # assume it is a file name.
   elsif (not _known_keys()->{$_[0]} )  {
     $option{file} =  shift;
-  }
-  else {
+  } else {
       # Should be a known key. Nothing to do.
   }
-
 
   # Now, check to see if the next arg is also a reference. 
   my $data;
   if (ref $_[0]) {
-      $data = shift;
-      $data = [$data] unless ref $data eq 'ARRAY';
+    $data = shift;
+    $data = [$data] unless ref $data eq 'ARRAY';
 
-      for my $source (@$data) {
-          if (ref $source eq 'HASH') {
-              push @{ $option{fdat} }, $source;
-          }
-          elsif (ref $source) {
-              if ($source->can('param')) {
-                  push @{ $option{fobject} }, $source;
-              }
-              else {
-                  croak "data source $source does not supply a param method";
-              }
-          }
-          elsif (defined $source) {
-              croak "data source $source is not a hash or object reference";
-          }
+    for my $source (@$data) {
+      if (ref $source eq 'HASH') {
+        push @{ $option{fdat} }, $source;
+      } elsif (ref $source) {
+        if ($source->can('param')) {
+          push @{ $option{fobject} }, $source;
+        } else {
+          croak "data source $source does not supply a param method";
+        }
+      } elsif (defined $source) {
+        croak "data source $source is not a hash or object reference";
       }
-
+    }
   }
-
  
   # load in the rest of the options
   %option = (%option, @_);
 
-
   # As suggested in the docs, merge multiple fdats into one. 
   if (ref $option{fdat} eq 'ARRAY') {
-      my %merged;
-      for my $hash (@{ $option{fdat} }) {
-          for my $key (keys %$hash) {
-              $merged{$key} = $hash->{$key};
-          }
+    my %merged;
+    for my $hash (@{ $option{fdat} }) {
+      for my $key (keys %$hash) {
+        $merged{$key} = $hash->{$key};
       }
-      $option{'fdat'} = \%merged;
+    }
+    $option{'fdat'} = \%merged;
   }
-
 
   my %ignore_fields;
   %ignore_fields = map { $_ => 1 } ( ref $option{'ignore_fields'} eq 'ARRAY' )
@@ -160,11 +148,11 @@ sub fill {
   # We want the reference to these objects to go out of scope at the
   # end of the method.
   local $self->{objects} = [];
-  if(my $objects = $option{fobject}){
-    unless(ref($objects) eq 'ARRAY'){
+  if (my $objects = $option{fobject}) {
+    unless (ref($objects) eq 'ARRAY') {
       $objects = [ $objects ];
     }
-    for my $object (@$objects){
+    for my $object (@$objects) {
       # make sure objects in 'param_object' parameter support param()
       defined($object->can('param')) or
         croak("HTML::FillInForm->fill called with fobject option, containing object of type " . ref($object) . " which lacks a param() method!");
@@ -172,17 +160,18 @@ sub fill {
 
     $self->{objects} = $objects;
   }
-  if (my $target = $option{target}){
+
+  if (my $target = $option{target}) {
     $self->{'target'} = $target;
   }
 
-  if (my $invalid_class = $option{invalid_class}){
+  if (my $invalid_class = $option{invalid_class}) {
     $self->{'invalid_class'} = $invalid_class;
   } else {
     $self->{'invalid_class'} = 'invalid';
   }
 
-  if (defined($option{fill_password})){
+  if (defined($option{fill_password})) {
     $self->{fill_password} = $option{fill_password};
   } else {
     $self->{fill_password} = 1;
@@ -191,18 +180,19 @@ sub fill {
   $self->{clear_absent_checkboxes} = $option{clear_absent_checkboxes};
 
   # make sure method has data to fill in HTML form with!
-  unless(exists $self->{fdat} || $self->{objects}){
-    croak("HTML::FillInForm->fillInForm() called without 'fobject' or 'fdat' parameter set");
+  unless (exists $self->{fdat} || $self->{objects}) {
+    croak "HTML::FillInForm->fillInForm() called without 'fobject' or " .
+          "'fdat' parameter set";
   }
 
   local $self->{object_param_cache};
 
-  if(my $file = $option{file}){
+  if (my $file = $option{file}) {
     $self->parse_file($file);
-  } elsif (my $scalarref = $option{scalarref}){
+  } elsif (my $scalarref = $option{scalarref}) {
     $self->parse($$scalarref);
-  } elsif (my $arrayref = $option{arrayref}){
-    for (@$arrayref){
+  } elsif (my $arrayref = $option{arrayref}) {
+    for (@$arrayref) {
       $self->parse($_);
     }
   }
@@ -226,15 +216,14 @@ sub start {
     }
   }
 
-  # This form is not my target.
+  # This form is not my target
   if (exists $self->{'target'} &&
-      (! exists $self->{'current_form'} ||
+       (! exists $self->{'current_form'} ||
        $self->{'current_form'} ne $self->{'target'})) {
     $self->{'output'} .= $origtext;
     return;
   }
   
-  # HTML::Parser converts tagname to lowercase, so we don't need /i
   if ($self->{option_no_value}) {
     $self->{output} .= '>';
     delete $self->{option_no_value};

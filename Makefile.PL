@@ -8,5 +8,15 @@ WriteMakefile(
 	HTML::Parser => 3.26,
 	HTML::TokeParser => 3.26,
         warnings => 0
-      },
+    },
+    META_MERGE		=> {
+        'meta-spec' => { version => 2 },
+        resources => {
+            repository => {
+                type => 'git',
+                url  => 'https://github.com/markstos/HTML-FillInForm.git',
+                web  => 'https://github.com/markstos/HTML-FillInForm',
+            },
+        },
+    },
 );

@@ -348,7 +348,7 @@ sub start {
 	    if ( $attr->{'value'} eq __escapeHTML($value->[0])){
 	      shift @$value if ref($value) eq 'ARRAY';
 	      $attr->{selected} = 'selected';
-              $self->{selectSelected} = 1; # remeber that an option tag is selected for this select tag
+              $self->{selectSelected} = 1; # remember that an option tag is selected for this select tag
 	    }
           }
         }

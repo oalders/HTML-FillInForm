@@ -9,6 +9,9 @@ WriteMakefile(
 	HTML::TokeParser => 3.26,
         warnings => 0
     },
+    TEST_REQUIRES => {
+        CGI => 0
+    },
     META_MERGE		=> {
         'meta-spec' => { version => 2 },
         resources => {

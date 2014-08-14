@@ -1,4 +1,8 @@
 
+2.21 - August 14th, 2014
+
+  - Declare CGI.pm as a testing dependency (RT #98012, thanks to Martin McGrath)
+
 2.20 - August 10th, 2013
 
     - Updated to support HTML5 (RT #75933, thanks to charsbar)

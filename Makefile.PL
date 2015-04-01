@@ -5,12 +5,15 @@ WriteMakefile(
     'NAME'		=> 'HTML::FillInForm',
     'VERSION_FROM'	=> 'lib/HTML/FillInForm.pm', # finds $VERSION
     'PREREQ_PM'		=> {
-	HTML::Parser => 3.26,
-	HTML::TokeParser => 3.26,
+        Carp => 0,
+        HTML::Parser => 3.26,
+        HTML::TokeParser => 3.26,
         warnings => 0
     },
     TEST_REQUIRES => {
-        CGI => 0
+        CGI => 0,
+	Test => 0,
+	Test::More => 0,
     },
     META_MERGE		=> {
         'meta-spec' => { version => 2 },

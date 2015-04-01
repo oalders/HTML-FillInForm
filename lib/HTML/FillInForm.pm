@@ -754,6 +754,13 @@ L<http://www.perlmonks.org/index.pl?node_id=274534>
 All rights reserved. This package is free software; you can
 redistribute it and/or modify it under the same terms as Perl itself.
 
+=head1 LICENSE
+
+Copyright (c) 2002-2007 Thomas J. Mather, tjmather@maxmind.com 
+
+All rights reserved. This package is free software; you can redistribute
+it and/or modify it under the same terms as Perl itself. 
+
 =head1 SEE ALSO
 
 L<HTML::Parser|HTML::Parser>, 

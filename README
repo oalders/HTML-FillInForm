@@ -13,7 +13,7 @@ To install this module, use CPAN, for example:
 
   cpan HTML::FillInForm
 
-To isntead build this software from source, run:
+To instead build this software from source, run:
 
   perl Makefile.PL
   make

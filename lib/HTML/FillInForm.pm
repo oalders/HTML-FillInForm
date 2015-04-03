@@ -424,7 +424,12 @@ sub _get_param {
   # traverse the list in reverse order for backwards compatibility
   # with the previous implementation.
   for my $o (reverse @{$self->{objects}}) {
-    my @v = $o->param($param);
+    my @v;
+    if ($o->can('multi_param')) {
+      @v = $o->multi_param($param);
+    } else {
+      @v = $o->param($param);
+    }
 
     next unless @v;
 

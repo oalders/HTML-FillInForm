@@ -321,7 +321,7 @@ sub start {
     $self->{output} .= ' /' if $attr->{'/'};
     $self->{output} .= ">";
   } elsif ($tagname eq 'option'){
-    my $value = $self->_get_param($self->{selectName});
+    my $value = defined($self->{selectName}) ? $self->_get_param($self->{selectName}) : undef;
 
     # browsers do not pass selects with no selected options at all,
     # so hack around

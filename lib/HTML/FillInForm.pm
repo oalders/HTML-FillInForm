@@ -4,6 +4,7 @@ use integer; # no floating point math so far!
 use strict; # and no funny business, either.
 
 use Carp; # generate better errors with more context
+use HTML::Entities qw/ encode_entities decode_entities /;
 
 
 # required for UNIVERSAL->can
@@ -25,13 +26,6 @@ sub new {
   @ISA = ($parser_class);
 
   $self->init(@_);
-
-  unless ($self->can('attr_encoded')) { 
-     die "attr_encoded method is missing. If are using HTML::Parser, you need at least version 3.26";
-  }
-
-  # tell HTML::Parser not to decode attributes
-  $self->attr_encoded(1);
 
   return $self;
 }
@@ -211,6 +205,16 @@ sub fill {
   return delete $self->{output};
 }
 
+sub _build_tag {
+  my ($self, $tagname, $attr) = @_;
+
+  $self->{output} .= "<$tagname";
+  while (my ($key, $value) = each %$attr) {
+    next if $key eq '/';
+    $self->{output} .= sprintf qq( %s="%s"), $key, encode_entities($value);
+  }
+}
+
 # handles opening HTML tags such as <input ...>
 sub start {
   my ($self, $tagname, $attr, $attrseq, $origtext) = @_;
@@ -278,13 +282,13 @@ sub start {
 	  $value = shift @$value;
 	  $value = '' unless defined $value;
         }
-	$attr->{'value'} = __escapeHTML($value);
+	$attr->{'value'} = $value;
       } elsif (lc $attr->{'type'} eq 'password' && $self->{fill_password}) {
 	if ( ref($value) eq 'ARRAY' ) {
 	  $value = shift @$value;
 	  $value = '' unless defined $value;
         }
-	$attr->{'value'} = __escapeHTML($value);
+	$attr->{'value'} = $value;
       } elsif (lc $attr->{'type'} eq 'radio'){
 	if ( ref($value) eq 'ARRAY' ) {
 	  $value = $value->[0];
@@ -292,7 +296,7 @@ sub start {
         }
 	# value for radio boxes default to 'on', works with netscape
 	$attr->{'value'} = 'on' unless exists $attr->{'value'};
-	if ($attr->{'value'} eq __escapeHTML($value)){
+	if ($attr->{'value'} eq $value){
 	  $attr->{'checked'} = 'checked';
 	} else {
 	  delete $attr->{'checked'};
@@ -304,7 +308,7 @@ sub start {
 	delete $attr->{'checked'}; # Everything is unchecked to start
         $value = [ $value ] unless ref($value) eq 'ARRAY';
 	foreach my $v ( @$value ) {
-	  if ( $attr->{'value'} eq __escapeHTML($v) ) {
+	  if ( $attr->{'value'} eq $v ) {
 	    $attr->{'checked'} = 'checked';
 	  }
 	}
@@ -312,11 +316,7 @@ sub start {
 #	warn(qq(Input field of unknown type "$attr->{type}": $origtext));
       }
     }
-    $self->{output} .= "<$tagname";
-    while (my ($key, $value) = each %$attr) {
-      next if $key eq '/';
-      $self->{output} .= sprintf qq( %s="%s"), $key, $value;
-    }
+    $self->_build_tag($tagname, $attr);
     # extra space put here to work around Opera 6.01/6.02 bug
     $self->{output} .= ' /' if $attr->{'/'};
     $self->{output} .= ">";
@@ -338,14 +338,14 @@ sub start {
         if ($self->{selectMultiple}){
           # check if the option tag belongs to a multiple option select
 	  foreach my $v ( grep { defined } @$value ) {
-	    if ( $attr->{'value'} eq __escapeHTML($v) ){
+	    if ( $attr->{'value'} eq $v ){
 	      $attr->{selected} = 'selected';
 	    }
           }
         } else {
           # if not every value of a fdat ARRAY belongs to a different select tag
           if (not $self->{selectSelected}){
-	    if ( $attr->{'value'} eq __escapeHTML($value->[0])){
+	    if ( $attr->{'value'} eq $value->[0]){
 	      shift @$value if ref($value) eq 'ARRAY';
 	      $attr->{selected} = 'selected';
               $self->{selectSelected} = 1; # remember that an option tag is selected for this select tag
@@ -355,13 +355,10 @@ sub start {
       } else {
         # option tag has no value attr - <OPTION>bar</OPTION>
 	# save for processing under text handler
-	$self->{option_no_value} = __escapeHTML($value);
+	$self->{option_no_value} = $value;
       }
     }
-    $self->{output} .= "<$tagname";
-    while (my ($key, $value) = each %$attr) {
-      $self->{output} .= sprintf qq( %s="%s"), $key, $value;
-    }
+    $self->_build_tag($tagname, $attr);
     unless ($self->{option_no_value}){
       # we can close option tag here
       $self->{output} .= ">";
@@ -370,10 +367,7 @@ sub start {
     # need to re-output the <textarea> if we're marking it invalid
     # (doesn't disable need this too?)
     if ($invalidating) {
-        $self->{output} .= "<$tagname";
-        while (my ($key, $value) = each %$attr) {
-            $self->{output} .= sprintf qq( %s="%s"), $key, $value;
-        }
+        $self->_build_tag($tagname, $attr);
         $self->{output} .= ">";
     } else {
         $self->{output} .= $origtext;
@@ -384,7 +378,7 @@ sub start {
       # <textarea> foobar </textarea> -> <textarea> $value </textarea>
       # we need to set outputText to 'no' so that 'foobar' won't be printed
       $self->{outputText} = 'no';
-      $self->{output} .= __escapeHTML($value);
+      $self->{output} .= encode_entities($value);
     }
 
   } elsif ($tagname eq 'select'){
@@ -399,10 +393,7 @@ sub start {
     # need to re-output the <select> if we're marking it invalid
     # (doesn't disable need this too?)
     if ($invalidating) {
-        $self->{output} .= "<$tagname";
-        while (my ($key, $value) = each %$attr) {
-            $self->{output} .= sprintf qq( %s="%s"), $key, $value;
-        }
+        $self->_build_tag($tagname, $attr);
         $self->{output} .= ">";
     } else {
         $self->{output} .= $origtext;
@@ -479,12 +470,7 @@ sub end {
 sub __escapeHTML {
   my ($toencode) = @_;
 
-  return undef unless defined($toencode);
-  $toencode =~ s/&/&amp;/g;
-  $toencode =~ s/\"/&quot;/g;
-  $toencode =~ s/>/&gt;/g;
-  $toencode =~ s/</&lt;/g;
-  return $toencode;
+  return defined $toencode ? encode_entities($toencode) : undef;
 }
 
 sub comment {

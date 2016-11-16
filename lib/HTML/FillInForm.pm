@@ -167,7 +167,7 @@ sub fill {
     for my $object (@$objects){
       # make sure objects in 'param_object' parameter support param()
       defined($object->can('param')) or
-	croak("HTML::FillInForm->fill called with fobject option, containing object of type " . ref($object) . " which lacks a param() method!");
+        croak("HTML::FillInForm->fill called with fobject option, containing object of type " . ref($object) . " which lacks a param() method!");
     }
 
     $self->{objects} = $objects;
@@ -273,45 +273,48 @@ sub start {
     if (defined($value)){
       # check for input type, noting that default type is text
       if (!exists $attr->{'type'} ||
-	  $attr->{'type'} =~ /^(text|textfield|hidden|tel|search|url|email|datetime|date|month|week|time|datetime\-local|number|range|color|)$/i){
-	if ( ref($value) eq 'ARRAY' ) {
-	  $value = shift @$value;
-	  $value = '' unless defined $value;
+          $attr->{'type'} =~ /^(text|textfield|hidden|tel|search|url|email|datetime|date|month|week|time|datetime\-local|number|range|color|)$/i) {
+        if ( ref($value) eq 'ARRAY' ) {
+          $value = shift @$value;
+          $value = '' unless defined $value;
         }
-	$attr->{'value'} = __escapeHTML($value);
+        $attr->{'value'} = __escapeHTML($value);
       } elsif (lc $attr->{'type'} eq 'password' && $self->{fill_password}) {
-	if ( ref($value) eq 'ARRAY' ) {
-	  $value = shift @$value;
-	  $value = '' unless defined $value;
+        if ( ref($value) eq 'ARRAY' ) {
+          $value = shift @$value;
+          $value = '' unless defined $value;
         }
-	$attr->{'value'} = __escapeHTML($value);
+        $attr->{'value'} = __escapeHTML($value);
       } elsif (lc $attr->{'type'} eq 'radio'){
-	if ( ref($value) eq 'ARRAY' ) {
-	  $value = $value->[0];
-	  $value = '' unless defined $value;
+        if ( ref($value) eq 'ARRAY' ) {
+          $value = $value->[0];
+          $value = '' unless defined $value;
         }
-	# value for radio boxes default to 'on', works with netscape
-	$attr->{'value'} = 'on' unless exists $attr->{'value'};
-	if ($attr->{'value'} eq __escapeHTML($value)){
-	  $attr->{'checked'} = 'checked';
-	} else {
-	  delete $attr->{'checked'};
-	}
-      } elsif (lc $attr->{'type'} eq 'checkbox'){
-	# value for checkboxes default to 'on', works with netscape
-	$attr->{'value'} = 'on' unless exists $attr->{'value'};
 
-	delete $attr->{'checked'}; # Everything is unchecked to start
+        # value for radio boxes default to 'on', works with netscape
+        $attr->{'value'} = 'on' unless exists $attr->{'value'};
+        if ($attr->{'value'} eq __escapeHTML($value)){
+          $attr->{'checked'} = 'checked';
+        } else {
+          delete $attr->{'checked'};
+        }
+      } elsif (lc $attr->{'type'} eq 'checkbox'){
+        # value for checkboxes default to 'on', works with netscape
+        $attr->{'value'} = 'on' unless exists $attr->{'value'};
+
+        delete $attr->{'checked'}; # Everything is unchecked to start
         $value = [ $value ] unless ref($value) eq 'ARRAY';
-	foreach my $v ( @$value ) {
-	  if ( $attr->{'value'} eq __escapeHTML($v) ) {
-	    $attr->{'checked'} = 'checked';
-	  }
-	}
-#      } else {
-#	warn(qq(Input field of unknown type "$attr->{type}": $origtext));
+        foreach my $v ( @$value ) {
+          if ( $attr->{'value'} eq __escapeHTML($v) ) {
+            $attr->{'checked'} = 'checked';
+          }
+        }
+
+        #      } else {
+        # warn(qq(Input field of unknown type "$attr->{type}": $origtext));
       }
     }
+
     $self->{output} .= "<$tagname";
     while (my ($key, $value) = each %$attr) {
       next if $key eq '/';
@@ -329,18 +332,18 @@ sub start {
 
     $value = [ $value ] unless ( ref($value) eq 'ARRAY' );
 
-    if ( defined $value->[0] ){
+    if (defined $value->[0]) {
       delete $attr->{selected} if exists $attr->{selected};
       
-      if(defined($attr->{'value'})){
+      if (defined($attr->{'value'})) {
         # option tag has value attr - <OPTION VALUE="foo">bar</OPTION>
         
         if ($self->{selectMultiple}){
           # check if the option tag belongs to a multiple option select
-	  foreach my $v ( grep { defined } @$value ) {
-	    if ( $attr->{'value'} eq __escapeHTML($v) ){
-	      $attr->{selected} = 'selected';
-	    }
+          foreach my $v ( grep { defined } @$value ) {
+            if ( $attr->{'value'} eq __escapeHTML($v) ){
+              $attr->{selected} = 'selected';
+            }
           }
         } else {
           # if not every value of a fdat ARRAY belongs to a different select tag
@@ -354,8 +357,8 @@ sub start {
         }
       } else {
         # option tag has no value attr - <OPTION>bar</OPTION>
-	# save for processing under text handler
-	$self->{option_no_value} = __escapeHTML($value);
+        # save for processing under text handler
+        $self->{option_no_value} = __escapeHTML($value);
       }
     }
     $self->{output} .= "<$tagname";
@@ -446,8 +449,8 @@ sub text {
       $value =~ s/^\s+//;
       $value =~ s/\s+$//;
       foreach my $v ( @$values ) {
-	if ( $value eq $v ) {
-	  $self->{output} .= ' selected="selected"';
+        if ( $value eq $v ) {
+          $self->{output} .= ' selected="selected"';
         }
       }
       # close <OPTION> tag

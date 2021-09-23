@@ -37,3 +37,7 @@ my $strings_html = join("\n", sort split(/[\s><]+/, lc($html)));
 
 is($strings_output,$strings_html);
 
+
+$html = q{<form><input name="foo" value='"quoted"'>};
+$output = HTML::FillInForm->fill(\$html, {});
+like $output, qr/value="&quot;quoted&quot;"/, 'unescaped values are escaped';

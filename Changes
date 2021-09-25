@@ -1,6 +1,6 @@
 Revision history for HTML-FillInForm
 
-{{$NEXT}}
+2.22      2021-09-25 23:00:59Z
 
     - Patch bug #100926, compatibility with CGI 4 (with fallback). (GH#9) (thrig)
     - Don't call _get_param(undef) for <select> box without name attribute

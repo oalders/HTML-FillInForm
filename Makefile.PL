@@ -28,10 +28,10 @@ my %WriteMakefileArgs = (
     "File::Spec" => 0,
     "HTML::TokeParser" => 0,
     "Test" => 0,
-    "Test::More" => 0,
+    "Test::More" => "0.96",
     "warnings" => 0
   },
-  "VERSION" => "2.21",
+  "VERSION" => "2.22",
   "test" => {
     "TESTS" => "t/*.t"
   }
@@ -45,7 +45,7 @@ my %FallbackPrereqs = (
   "File::Spec" => 0,
   "HTML::TokeParser" => 0,
   "Test" => 0,
-  "Test::More" => 0,
+  "Test::More" => "0.96",
   "integer" => 0,
   "strict" => 0,
   "vars" => 0,

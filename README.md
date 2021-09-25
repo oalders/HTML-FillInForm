@@ -11,7 +11,7 @@ HTML::FillInForm - Populates HTML Forms with data.
 
 # VERSION
 
-version 2.21
+version 2.22
 
 # SYNOPSIS
 

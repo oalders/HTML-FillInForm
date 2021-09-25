@@ -528,9 +528,7 @@ sub declaration {
 
 __END__
 
-=head1 NAME
-
-HTML::FillInForm - Populates HTML Forms with data.
+# ABSTRACT: Populates HTML Forms with data.
 
 =head1 DESCRIPTION
 
@@ -714,10 +712,6 @@ Using HTML::FillInForm from HTML::Mason is covered in the FAQ on
 the masonhq.com website at
 L<http://www.masonhq.com/?FAQ:HTTPAndHTML#h-how_can_i_populate_form_values_automatically_>
 
-=head1 VERSION
-
-This documentation describes HTML::FillInForm module version 2.1
-
 =head1 SECURITY
 
 Note that you might want to think about caching issues if you have password
@@ -751,20 +745,6 @@ insert CGI data into forms, but require that you mix HTML with Perl.
 
 There is a nice review of the module available here:
 L<http://www.perlmonks.org/index.pl?node_id=274534>
-
-=head1 AUTHOR
-
-(c) 2011 TJ Mather, tjmather@maxmind.com, L<http://www.maxmind.com/>
-
-All rights reserved. This package is free software; you can
-redistribute it and/or modify it under the same terms as Perl itself.
-
-=head1 LICENSE
-
-Copyright (c) 2002-2007 Thomas J. Mather, tjmather@maxmind.com 
-
-All rights reserved. This package is free software; you can redistribute
-it and/or modify it under the same terms as Perl itself. 
 
 =head1 SEE ALSO
 

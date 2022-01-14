@@ -1,7 +1,7 @@
 use strict;
 use warnings FATAL => 'all';
 use Test::More;
-use HTML::FillInForm;
+use HTML::FillInForm ();
 
 # See http://www.w3.org/TR/html5/forms.html#the-input-element
 

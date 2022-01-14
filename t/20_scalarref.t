@@ -1,7 +1,7 @@
 use strict;
 use warnings;
 use Test::More;
-use HTML::FillInForm;
+use HTML::FillInForm ();
 
 # a few strings to test against
 my @contents = (

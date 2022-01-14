@@ -3,7 +3,7 @@ our $VERSION = '2.23';
 use integer; # no floating point math so far!
 use strict; # and no funny business, either.
 
-use Carp; # generate better errors with more context
+use Carp qw( croak ); # generate better errors with more context
 
 
 # required for UNIVERSAL->can

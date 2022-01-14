@@ -6,8 +6,8 @@ $^W = 1;
 
 print "1..2\n";
 
-use HTML::FillInForm;
-use CGI;
+use HTML::FillInForm ();
+use CGI ();
 
 print "ok 1\n";
 

@@ -1,10 +1,10 @@
 # -*- Mode: Perl; -*-
 
 use strict;
-use Test;
+use Test qw( ok plan );
 BEGIN { plan tests => 8 }
 
-use HTML::FillInForm;
+use HTML::FillInForm ();
 
 my $form = <<EOF;
 <FORM name="foo1">

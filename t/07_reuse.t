@@ -6,7 +6,7 @@ $^W = 1;
 
 print "1..2\n";
 
-use HTML::FillInForm;
+use HTML::FillInForm ();
 
 print "ok 1\n";
 

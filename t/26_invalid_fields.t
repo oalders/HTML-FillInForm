@@ -5,8 +5,8 @@ use warnings;
 
 use Test::More;
 
-use HTML::FillInForm;
-use HTML::TokeParser;
+use HTML::FillInForm ();
+use HTML::TokeParser ();
 
 my $html = qq[<form><input type="text" name="one" value="all wrong"><input type="text" name="two" class="existing" value="worse"><input type="text" name="three" class="invalid" value="already bad"><select name="four"><option value="1">Foo</option><option value="2">Boo</option></select><textarea name="five"></textarea></form>];
 

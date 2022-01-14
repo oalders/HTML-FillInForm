@@ -3,7 +3,7 @@
 use Test::More 'no_plan';
 use strict;
 
-use HTML::FillInForm;
+use HTML::FillInForm ();
  
 my $html =<<"__HTML__";
 <HTML>
